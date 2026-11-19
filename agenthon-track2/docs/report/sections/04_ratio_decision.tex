@@ -1,0 +1,136 @@
+\section{Decision theory under a ratio loss}\label{sec:ratio}
+
+\subsection{Setting}
+
+Fix a card. Let $P$ be the agent's honest predictive belief for $\bm Y$, $F^0$ the (known) law of M0's draws, and $Q$ the law of the submitted
+draws. The expected leaderboard loss of submitting $Q$ is
+\begin{equation}\label{eq:risk}
+  \mathcal R(Q) \;=\; \E_{\bm Y\sim P}\Bigl[\min\Bigl\{4,\ \sum_k \tilde w_k\, \frac{S_k(Q,\bm Y)}{\bar S_k^0(\bm Y)}\Bigr\}\Bigr].
+\end{equation}
+Ignoring the clip for the moment, $\mathcal R(Q)=\sum_k\tilde w_k\,\E_P[\omega_k(\bm Y)S_k(Q,\bm Y)]$ with outcome weights
+$\omega_k(\bm y)=1/\bar S^0_k(\bm y)$ that do not depend on $Q$.
+
+\subsection{The Bayes act is a reweighted belief}
+
+\begin{definition}[Weighted belief]
+For a measurable $\omega\ge0$ with $0<Z_\omega=\E_P\omega(\bm Y)<\infty$, the $\omega$-tilted belief is $P_\omega(dy)=\omega(y)P(dy)/Z_\omega$.
+\end{definition}
+
+\begin{theorem}[Bayes act for one weighted proper score]\label{thm:bayes}
+Let $S$ be a proper scoring rule and $\omega$ as above. Then
+\begin{equation}
+  \argmin_Q \E_P[\omega(\bm Y) S(Q,\bm Y)] \;\ni\; P_\omega,
+\end{equation}
+and if $S$ is strictly proper the minimiser is unique.
+\end{theorem}
+\begin{proof}
+For any $Q$, $\E_P[\omega S(Q,\cdot)]=\int S(Q,y)\,\omega(y)P(dy)=Z_\omega\,\E_{P_\omega}[S(Q,\bm Y)]$. Since $Z_\omega>0$ does not depend on $Q$,
+minimising the left side is minimising the expected score under $P_\omega$, whose minimiser is $P_\omega$ by propriety (uniquely under strict
+propriety).
+\end{proof}
+
+\begin{corollary}
+CRPS is strictly proper on distributions with finite first moment, so if the composite were the marginal CRPS alone, the metric-optimal
+submission would be $P$ tilted by $1/\CRPS(F^0,\bm y)$. The pinball loss at level $\alpha$ is proper for the $\alpha$-quantile functional, so the
+optimal tail quantiles are the quantiles of $P$ tilted by $1/\PB(F^0,\bm y)$. The variogram score (Proposition~\ref{prop:vs-opt}) is optimised by
+matching $\E|X_i-X_j|^p$ under $P$ tilted by $1/\VS(F^0,\bm y)$.
+\end{corollary}
+
+The three components call for three different tilts, and no single $Q$ attains all three optima simultaneously. We therefore restrict to a
+one-parameter family and optimise that parameter empirically.
+
+\begin{definition}[Tempered score-aware operator]\label{def:tempered}
+Let $\bar s_k=\E_{P}[S^0_k(\bm Y)]$ be the average baseline component under the belief. Define the combined proxy weight and the tempered
+tilt, for $\gamma\ge0$:
+\begin{equation}\label{eq:weight}
+  \omega(\bm y) \;=\; \Bigl(\sum_k \tilde w_k\,\frac{S^0_k(\bm y)}{\bar s_k}\Bigr)^{-1},\qquad
+  Q_\gamma(d\bm y)\;\propto\;\omega(\bm y)^{\gamma}\,P(d\bm y).
+\end{equation}
+\end{definition}
+$\gamma=0$ is the honest belief; $\gamma=1$ is the Bayes act of Theorem~\ref{thm:bayes} for the combined proxy weight. Tempering ($\gamma<1$)
+hedges against the fact that $P$ is itself estimated; $\gamma>1$ over-weights the region where M0 is sharp.
+
+\subsection{Why the tilt concentrates the submission}
+
+\begin{proposition}[Shape of the weight for a Gaussian baseline]\label{prop:shape}
+Let one cell have baseline $F^0=\mathcal N(m,\sigma^2)$ and $z=(y-m)/\sigma$. Then
+$\CRPS(F^0,y)=\sigma\bigl[z(2\Phi(z)-1)+2\varphi(z)-\pi^{-1/2}\bigr]$, which is even in $z$, increasing in $|z|$, equal to
+$\sigma(\sqrt2-1)/\sqrt\pi\approx0.234\sigma$ at $z=0$ and asymptotic to $\sigma|z|$. Consequently $\omega\propto 1/\CRPS$ is maximal at the baseline
+median and decays like $1/|z|$.
+\end{proposition}
+\begin{proof}
+The closed form is the standard Gaussian CRPS (Gneiting and Raftery). Its derivative in $z$ is $\sigma(2\Phi(z)-1)$, which has the sign of $z$;
+evenness follows from $\Phi(-z)=1-\Phi(z)$ and the evenness of $\varphi$. At $z=0$ the bracket is $2\varphi(0)-\pi^{-1/2}=(\sqrt2-1)/\sqrt\pi$.
+As $|z|\to\infty$, $2\Phi(z)-1\to\sgn z$ and $\varphi\to0$.
+\end{proof}
+Multiplying $P$ by a weight decaying like $|z|^{-\gamma}$ both sharpens it and pulls it toward M0's centre. The composite ratio penalises
+deviations from M0's centre convexly (being wrong where M0 is right costs up to $4$; being right where M0 is wrong gains at most about
+$0.7$), and the tilt is the formal counterweight to that convexity.
+
+\subsection{A simulation with a correctly specified baseline}
+
+Take $Y\sim\mathcal N(0,1)$, $F^0=\mathcal N(0,1)$ from $500$ draws, single-cell weights $(0.714,0.286)$, and an honest belief equal to the truth.
+Averaged over $300$ replications of $4{,}000$ outcomes:
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+& $\gamma=0$ (honest) & $\gamma=0.5$ & $\gamma=1$ & $\gamma=1.5$\\
+\midrule
+Gaussian truth & $1.004$ & $\mathbf{0.962}$ & $0.975$ & $1.029$\\
+Student-$t_5$ truth (belief $=$ truth) & $0.976$ & $\mathbf{0.929}$ & $0.942$ & $0.992$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Even when M0 is exactly right, the honest forecast scores about $1$, while the tempered tilt scores about $0.96$. The optimum is interior because
+the tail term and the $1/x$ convexity pull in different directions. In real data the optimum sits higher ($\gamma\approx1$--$1.25$), because the
+belief and the baseline differ (Section~\ref{sec:results}).
+
+\subsection{Model averaging with the baseline}
+
+\begin{lemma}[Convexity in the forecast]\label{lem:convex}
+For fixed $y$, $F\mapsto\CRPS(F,y)$ is convex on distributions with finite mean, and so is $F\mapsto\VS(F,\bm y)$.
+\end{lemma}
+\begin{proof}
+$\CRPS(F,y)=\E_F|X-y|-\frac12\E_{F\otimes F}|X-X'|$. The first term is linear in $F$. For $F_\lambda=(1-\lambda)F+\lambda G$, the second is
+$\frac12 B(F_\lambda,F_\lambda)$ with the symmetric bilinear form $B(F,G)=\iint|x-x'|F(dx)G(dx')$. For signed measures of total mass zero,
+$B(\nu,\nu)=-2\int(\nu(-\infty,t])^2\,dt\le0$ (the energy-distance identity), so $B$ is negative semidefinite on differences, and
+$\lambda\mapsto -\frac12B(F_\lambda,F_\lambda)$ is convex. For VS, $\E_{F}|X_i-X_j|^p$ is linear in $F$ and $c\mapsto(u-c)^2$ is convex, so each summand
+is a convex function of a linear map of $F$.
+\end{proof}
+
+\begin{theorem}[Mixing caps the ratio]\label{thm:mix}
+Let $Q_\lambda=(1-\lambda)Q+\lambda F^0$, $\lambda\in[0,1]$. For every outcome $\bm y$ and $k\in\{m,j\}$,
+\begin{equation}
+  \frac{S_k(Q_\lambda,\bm y)}{S^0_k(\bm y)} \;\le\; (1-\lambda)\,\frac{S_k(Q,\bm y)}{S^0_k(\bm y)}+\lambda .
+\end{equation}
+\end{theorem}
+\begin{proof}
+By Lemma~\ref{lem:convex}, $S_k(Q_\lambda,\bm y)\le(1-\lambda)S_k(Q,\bm y)+\lambda S_k(F^0,\bm y)$; divide by $S^0_k(\bm y)=S_k(F^0,\bm y)>0$.
+\end{proof}
+The pinball component is \emph{not} convex in $F$ in general (a quantile of a mixture is not a mixture of quantiles), so the bound is stated
+only for CRPS and VS; empirically the tail component behaves similarly. The operator actually shipped is therefore two-parameter:
+\begin{equation}\label{eq:action}
+  Q_{\gamma,\lambda} \;=\; (1-\lambda)\,Q_\gamma + \lambda\,F^0 ,
+\end{equation}
+realised with draws: a fraction $1-\lambda$ of systematic-resampled belief draws under weights $\omega^\gamma$, and a fraction $\lambda$ resampled
+from M0's own $500$ draws, then shuffled so that draw indices carry no structure.
+
+\subsection{The honesty floor and stepping rule}
+
+Unrestricted, $Q_\gamma$ collapses onto M0's median as $\gamma\to\infty$. We impose:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Spread floor.} Reject a candidate if any cell's standard deviation falls below $0.6$ of the honest belief's.
+\item \textbf{Effective sample size.} Reject if $\mathrm{ESS}=(\sum_i p_i^2)^{-1}<0.1\,M$ for a pool of $M$ belief draws.
+\item \textbf{Stepping.} If the policy's action is rejected, decrease $\gamma$ by $0.25$ until accepted; $\gamma=0$ is always accepted.
+\end{enumerate}
+For a Gaussian belief equal to M0, the realised single-cell spread ratio is $0.85, 0.74, 0.65, 0.59$ at $\gamma=0.5,1,1.5,2$; with $D=4$ cells it is
+$0.94,0.89,0.85,0.83$. So $\gamma=1.5$ is about the largest admissible value on single-cell cards, and after mixing with $\lambda\approx0.3$ the
+submitted spread returns to about $0.75$ of M0's. This is a sharp core with the baseline's own tails, not a point forecast. The submission is
+concentrated at the random-walk centre, not at any remembered outcome.
+
+\subsection{Why per-card self-optimisation is not used}
+
+An alternative is to choose $\gamma$ per card by minimising a Monte-Carlo estimate of \eqref{eq:risk} under outcomes drawn from the belief. This
+is self-confirming: outcomes drawn from $P$ reward sharpening around $P$, so it always selects the largest admissible $\gamma$. It was observed to do
+exactly that and was replaced by a fixed, validated action chosen by the policy (Section~\ref{sec:policy}). The evaluation outcomes are in any case
+drawn from a robust mixture $(1-r)P+rF^0$ with $r=0.3$, disjoint from the resampling pool.

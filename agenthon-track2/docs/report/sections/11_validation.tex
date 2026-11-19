@@ -1,0 +1,65 @@
+\section{Validation methodology}\label{sec:validation}
+
+\subsection{Why the practice leaderboard cannot be the primary signal}
+
+Practice cards share the same underlying series and are truncated only at their own as-of dates. The organizers measured that for $75$ of $103$
+practice units every realised value appears, to full precision, in a sibling unit's published panel. Any improvement on the practice board is
+therefore confounded with recovering leaked values, which we never do. The primary signal is a self-constructed walk-forward; the practice board
+is a check of admissibility and, once per upload, a check of fidelity (Section~\ref{sec:results}).
+
+\subsection{History reconstruction}
+
+The full panels are not shipped. We rebuild them as the union of the practice units' truncated copies (tuning on published practice data is
+permitted). The consistency audit found $0$ conflicting $(\text{asset},\text{date})$ values once the worked exemplar was excluded: that unit ships an
+illustrative non-FRED 2024 panel, which initially produced $496$ conflicts of up to $75$\,bp. Coverage: Treasuries 2000-01-03 to 2024-12-18, G10 FX to
+2024-10-31, factors to 2024-05-31. No post-2024 data were downloaded: the sealed window is H2~2025 to Q2~2026, and tuning on data after an evaluation
+task's cutoff would breach the artifact policy.
+
+\subsection{Synthetic cards}
+
+Thirteen templates mirror the practice roster's shapes: single-cell rates and FX at long ($126/189$), mid ($63/64$) and short ($21$) horizons;
+factor log returns; UST curves ($4$ tenors $\times$ $\{63,126\}$ or $\{21,63\}$); G10 baskets; mixed rates-and-FX; factor pairs. As-of dates are every $21$
+business days from 2003, with realised values read from the $h$-th panel row after the as-of (or the sum of $\log(1+r)$ over it). This gives
+$3{,}896$ cards, each recording the last date its outcome needs (\code{target\_end}).
+
+\subsection{Production-exact evaluation}
+
+The lab calls the production function \code{forecast\_from\_pit} with an in-memory point-in-time slice, so the formulas are never forked between
+research and production. Each card is scored with the exact M0 replica and the exact metric, which is the leaderboard statistic itself. For every
+card the runner also scores every action $(\gamma,\lambda)$ on the same belief pool (full information), rejecting actions that break the spread
+floor.
+
+\subsection{Vintaged artifacts: out-of-sample by construction}
+
+\begin{definition}[Vintage]
+A vintage $v$ is a set of fitted overrides with a \code{fit\_cutoff} $t_v$ equal to the last date of any outcome used to fit or select it. A card
+with as-of $\tau$ uses the vintage $v^\star(\tau)=\argmax\{t_v: t_v<\tau\}$, or built-in priors if none exists.
+\end{definition}
+
+\begin{proposition}[No look-ahead through parameters]
+Under this rule, every parameter used to forecast a card was a measurable function of outcomes dated strictly before the card's as-of.
+\end{proposition}
+\begin{proof}
+By construction the fitting set of $v$ contains only cards with \code{target\_end}$\,\le t_v$, and $t_v<\tau$ for the selected vintage.
+\end{proof}
+The shipped vintages are $\{$2008-12-31, 2014-12-31, 2024-12-31$\}$. Cards dated 2003--2008 use theory priors ($\gamma=0.5$ from the simulation of
+Section~\ref{sec:ratio}, $\lambda=0.4$), cards dated 2009--2014 the 2008 vintage, cards dated 2015--2024 the 2014 vintage, and the sealed 2025+ cards
+the 2024 vintage. Consequently the whole 2003--2024 walk-forward, run with the production vintage rule, is an out-of-sample evaluation of the
+system that ships. The one exception is the variant-level choice of the belief model, which was made once on the pre-2015 split and is within noise.
+
+\subsection{Uncertainty: a block bootstrap over quarters}
+
+Cards with nearby as-of dates share outcome windows, so resampling cards independently would understate uncertainty. We resample \emph{calendar
+quarters} of as-of dates with replacement and recompute the mean. For $Q$ quarters with totals $(T_q,n_q)$ and resampled indices $q_1,\dots,q_Q$,
+\begin{equation}
+  \bar S^{*}=\frac{\sum_{i}T_{q_i}}{\sum_in_{q_i}},\qquad \text{CI}=\bigl[\mathrm{quantile}_{0.025}(\bar S^*),\ \mathrm{quantile}_{0.975}(\bar S^*)\bigr],
+\end{equation}
+from $400$ replications. This is the moving-block idea with blocks aligned to the calendar, which respects the dependence induced by overlapping
+horizons.
+
+\subsection{The ablation ladder and multiple testing}
+
+The rungs and their order were fixed before results were inspected: M0 (replica), M1 (driftless random walk at M0's width), M2 (variance term
+structure), M3 (plus analogues), M4--M8 (text rungs, on practice units: text, gate, contradiction, distribution update, dependence), M9 (fat tails
+and residual bank), M10 (calibration), M11 (full), M12 (stress slices). Tuning was one-factor-at-a-time around a base over a fixed list of $14$
+variants, selected on train and \emph{reported} on test. No open-ended search was run.

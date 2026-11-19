@@ -1,0 +1,128 @@
+# Frozen built-in defaults = mirror of agenthon.config.DEFAULTS (PRIORS, no fitted values).
+# Fitted values live in src/agenthon/resources/*_vintages.json with their fit cutoffs.
+# tests/unit/test_config.py fails if this file and DEFAULTS diverge. Regenerate with:
+#   python scripts/sync_config.py
+runtime:
+  profile: final
+  seed_salt: 20261013
+  total_seconds: 900
+  numeric_seconds: 60
+  text_seconds: 420
+sampling:
+  n_default: 2000
+  n_f4: 4000
+  n_min: 500
+  belief_pool: 6000
+  antithetic: true
+m0:
+  window: 300
+  draws: 500
+  override_ratio: 2.0
+numerical:
+  ewma_halflife: 30.0
+  long_window: 1260
+  lr_omega: 0.5
+  scale: 1.0
+  vol_persistence: 0.985
+  drift_shrink: 0.0
+  drift_shrink_return: 0.25
+  vr_shrink_n0: 40.0
+  vr_clip:
+  - 0.6
+  - 1.6
+  df: 12.0
+  corr_shrink: 0.15
+  zlb_enabled: true
+  zlb_floor: -0.1
+  macro_trend_halflife: 6.0
+  macro_trend_weight: 0.7
+  transfer_proxy_weight: 0.5
+analogue:
+  enabled: false
+  k: 40
+  weight: 0.15
+  min_history: 750
+regime:
+  enabled: true
+  calm_ratio: 0.8
+  stress_ratio: 1.35
+tails:
+  in_unit_backtest: false
+  backtest_stride: 10
+  backtest_years: 12
+  n0_scale: 60.0
+  n0_df: 120.0
+  scale_bias_clip:
+  - 0.75
+  - 1.35
+  df_clip:
+  - 4.0
+  - 30.0
+text:
+  enabled: true
+  max_docs: 60
+  max_chars_per_doc: 120000
+  chunk_chars: 900
+  top_k: 12
+  token_budget_chars: 14000
+  dedup_jaccard: 0.55
+  dedup_days: 5
+  recency_halflife_days: 45.0
+  retrieval_weights:
+    bm25: 1.0
+    recency: 0.6
+    asset: 0.8
+    novelty: 0.3
+    redundancy: 0.5
+    doc_type: 0.4
+llm:
+  enabled: true
+  max_calls: 3
+  max_tokens: 1800
+  timeout_seconds: 120
+  temperature: 0.0
+  seed: 7
+  retries: 1
+  enable_thinking: false
+gate:
+  w0: -1.2
+  w_retrieval: 1.1
+  w_confidence: 2.2
+  w_corroboration: 0.35
+  w_kappa: 1.4
+  lexicon_only_cap: 0.25
+  g_max: 0.85
+update:
+  alpha_shift: 0.25
+  max_text_vol_mult: 2.0
+  beta_vol: 0.3
+  lambda_kappa: 0.15
+  allow_text_narrowing: false
+  kappa_star: 0.55
+  tail_weight_max: 0.12
+  tail_scale: 2.2
+calibration:
+  enabled: false
+  shrink_n0: 200.0
+decision:
+  enabled: true
+  gamma: 0.5
+  lambda: 0.4
+  robust_mix: 0.3
+  gamma_grid:
+  - 0.0
+  - 0.5
+  - 1.0
+  - 1.25
+  lambda_grid:
+  - 0.0
+  - 0.2
+  - 0.3
+  min_sd_ratio: 0.6
+  optimise: false
+  eval_outcomes: 3000
+policy:
+  enabled: true
+  pessimism: 2.0
+output:
+  max_draws: 20000

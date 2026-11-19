@@ -1,0 +1,74 @@
+\section{Engineering, safety and compliance}\label{sec:engineering}
+
+\subsection{The fail-safe lattice}
+
+The design goal is that no card can cost more than the baseline, whatever breaks. Let $\mathcal P$ denote the set of pipeline stages. Degradation
+proceeds along a lattice of admissible outputs, from best to worst:
+\begin{equation*}
+  \text{full}\ \succ\ \text{numeric-only}\ \succ\ \text{M0 replica}\ \succ\ \text{minimal walk}\ \succ\ \text{constant around a stated anchor}.
+\end{equation*}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Text or fusion failure} (exception, timeout, unparseable answer, unreachable endpoint): $g=0$, and the result is P1 $=$ P0
+(Propositions~\ref{prop:tilt} and~\ref{prop:mix}).
+\item \textbf{Text update fails the spread sanity check} ($\sigma_c\notin[0.15,8]\cdot\sigma^{\MO}_c$ for some cell): the text update is dropped
+and the numeric belief is kept.
+\item \textbf{Any other exception}, including \code{KeyboardInterrupt} and a \code{SystemExit} raised deep in library code: the context is rebuilt
+from the card and panels alone and M0's draws are written. This scores exactly $1$ (Proposition~\ref{prop:m0one}).
+\item \textbf{M0 cannot be built}: a robust-scale walk with a common shock (perfect correlation is a safer joint default than independence for the
+variogram when nothing is known).
+\item \textbf{No panel at all}: small-spread draws around the level stated in the card's own prose (for example \code{CNY = 6.2097}), else $0$.
+Admissible, and better than the $4$ of a missing card.
+\end{itemize}
+
+\subsection{Admissibility by construction}
+
+The writer refuses to emit anything that would fail g0--g3: exactly three regular files; \code{draw} and \code{horizon} as \code{int32},
+\code{value} as \code{float64}; every (draw, asset, horizon) exactly once, with draw identifiers $0,\dots,N-1$; finite values; positive spread in every cell;
+$\max(200,n_{\min})\le N\le20000$; \code{unit\_id} and \code{asof} bound to the card; \code{representation} $=$ \code{samples}; a non-blank rationale.
+Files are written under temporary names and atomically renamed, and temporaries are always removed, so a crash cannot leave a fourth file or a
+half-written parquet.
+
+\subsection{Runtime}
+
+Pinned thread pools (four threads) respect the $256$-process limit. \code{HOME} and every cache point to \code{/tmp}, because the root filesystem
+is read-only and user $65534$ has no home. There are no JIT caches (\code{/tmp} is non-executable). Measured on the practice units: $0.38$\,s mean
+and $0.64$\,s maximum for the numeric path; about $2.7$\,s per unit in the container including start-up; House calls add at most $2\times120$\,s
+under the per-call timeout. The phase clock of about $400$\,s per unit is therefore never binding.
+
+\subsection{Determinism}
+
+The run seed is $\mathrm{crc32}(\text{unit\_id})\oplus(\text{salt}\cdot2654435761)\oplus(97\cdot\text{QFBENCH\_SEED})$. Two runs with the same seed
+produce identical parquet files (tested). The organizers' verification reruns on fresh seeds and compares bootstrap intervals, which the
+Monte-Carlo sizes ($N\ge2000$, $N\ge4000$ for F4) make stable.
+
+\subsection{Compliance matrix}
+
+\begin{center}
+\begin{tabular}{p{0.38\textwidth}p{0.55\textwidth}}
+\toprule
+rule & how it is met\\
+\midrule
+House model only, via the audited proxy & one endpoint from \code{MODEL\_ENDPOINT} with \code{MODEL\_TOKEN}; proxies read from the environment; no vendor APIs\\
+Vendor tools off; pinned temperature and seed & no \code{tools} field; temperature $0$; seed pinned; thinking off\\
+Request budget & at most $3$ calls against $25$; failures are not retried blindly (an admitted request costs a slot)\\
+No neural checkpoints without approval & text is lexical; the foundation model is a no-op; no weights in the image\\
+Fitted artifacts respect task cutoffs & vintaged with \code{fit\_cutoff} $<$ as-of (Section~\ref{sec:validation})\\
+No cross-unit lookup & retrieval and analogues over the mounted unit only; no value derived from any unit's target is shipped\\
+Text cutoff & corpus re-filtered at \code{min}(card, CLI) as-of; undated documents excluded\\
+Joint draws & path-coherent generator; one scenario and one mixing variable per draw\\
+Rationale & always written, including on fail-safe paths; states anchors, adjustments, documents cited, established versus inferred, and the decision layer\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The audit (v1.0.1)}
+
+A full audit after the first build found and fixed six issues. (1) A text update failing the sanity bound discarded the numeric forecast as
+well; it now degrades to numeric-only. (2) Text widening is capped at $2\times$ and the maximum centre shift reduced ($\alpha$: $0.35\to0.25$).
+(3) An HTTP $400$/$422$ now triggers one resend with the bare OpenAI body. (4) The last-resort constant is anchored on the level stated in the
+card prose. (5) The rationale now reports $\lambda$. (6) Four unused configuration keys were removed, and a documentation count was corrected.
+Earlier, adversarial tests had found two one-sidedness violations in schema coercion, a retrieval scoring flaw, a stale \code{default.yaml}
+overriding code defaults (now guarded by a test that fails on any drift), and the \code{pandas}~3 datetime-resolution bug. The final suite has
+$84$ tests (unit, integration including a mock House server, adversarial). Under the image's exact dependency stack (Python 3.13.5, numpy 2.1.3,
+pandas 2.2.3, pyarrow 18.1.0) all pass, and a harness-exact container run (no network, read-only root, uid 65534, $64$\,MiB \code{/tmp}, $256$
+processes) is admissible on $104/104$ units.

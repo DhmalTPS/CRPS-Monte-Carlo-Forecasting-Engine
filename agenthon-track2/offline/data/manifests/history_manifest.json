@@ -1,0 +1,68 @@
+{
+  "factors_daily": {
+    "rows": 37308,
+    "assets": [
+      "BAB",
+      "HML",
+      "MKT",
+      "MOM",
+      "QMJ",
+      "SMB"
+    ],
+    "start": "2000-01-03",
+    "end": "2024-05-31",
+    "conflicting_asset_dates": 0
+  },
+  "g10_fx_daily": {
+    "rows": 62280,
+    "assets": [
+      "AUD",
+      "CAD",
+      "CHF",
+      "DKK",
+      "EUR",
+      "GBP",
+      "JPY",
+      "NOK",
+      "NZD",
+      "SEK"
+    ],
+    "start": "2000-01-03",
+    "end": "2024-10-31",
+    "conflicting_asset_dates": 0
+  },
+  "rates_daily": {
+    "rows": 37470,
+    "assets": [
+      "UST_10Y",
+      "UST_20Y",
+      "UST_2Y",
+      "UST_30Y",
+      "UST_5Y",
+      "UST_7Y"
+    ],
+    "start": "2000-01-03",
+    "end": "2024-12-18",
+    "conflicting_asset_dates": 0
+  },
+  "em_transfer_early": {
+    "rows": 7870,
+    "assets": [
+      "BRL",
+      "CNY",
+      "INR"
+    ],
+    "start": "1993-05-24",
+    "end": "2018-06-15",
+    "conflicting_asset_dates": 0
+  },
+  "macro_monthly": {
+    "vintages": [
+      "2020-03-31",
+      "2022-05-31",
+      "2023-07-12",
+      "2024-08-02"
+    ],
+    "rows": 6510
+  }
+}

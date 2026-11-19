@@ -1,0 +1,13 @@
+.git
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+artifacts
+offline
+tests
+scripts
+submission
+*.zip
+*.parquet
+_reference

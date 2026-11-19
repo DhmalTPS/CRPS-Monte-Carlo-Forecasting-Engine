@@ -1,0 +1,8 @@
+# Final/official profile (image default). Budgeted well inside the ~400 s/unit phase average.
+runtime:
+  profile: final
+  total_seconds: 900
+  text_seconds: 420
+llm:
+  enabled: true
+  max_calls: 3

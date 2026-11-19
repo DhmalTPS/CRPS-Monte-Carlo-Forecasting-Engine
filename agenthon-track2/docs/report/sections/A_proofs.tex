@@ -1,0 +1,159 @@
+\section{Further results and proofs}\label{app:proofs}
+
+\subsection{Propriety of the scores}
+
+\begin{proposition}[CRPS is strictly proper]\label{prop:crps-proper}
+For distributions $F,G$ on $\R$ with finite first moments, with $\bar S(F,G)=\E_{Y\sim G}\CRPS(F,Y)$,
+\begin{equation}
+  \bar S(F,G)-\bar S(G,G)=\int_{-\infty}^{\infty}\bigl(F(t)-G(t)\bigr)^2\,dt\ \ge 0,
+\end{equation}
+with equality iff $F=G$.
+\end{proposition}
+\begin{proof}
+Use the threshold representation $\CRPS(F,y)=\int(F(t)-\ind\{y\le t\})^2dt$. Taking $\E_G$ inside, for each $t$,
+$\E_G(F(t)-\ind\{Y\le t\})^2=F(t)^2-2F(t)G(t)+G(t)=(F(t)-G(t))^2+G(t)(1-G(t))$. The last term does not depend on $F$ and integrates to
+$\bar S(G,G)$. Equality forces $F(t)=G(t)$ for almost every $t$, hence everywhere by right-continuity.
+\end{proof}
+
+\begin{proposition}[The fair estimator is unbiased]
+If $X_1,\dots,X_N$ are i.i.d.\ from $F$, then $\E$ of \eqref{eq:crps} equals $\CRPS(F,y)$ for every $y$.
+\end{proposition}
+\begin{proof}
+$\E\frac1N\sum_k|X_k-y|=\E_F|X-y|$. The double sum over $k\ne l$ has $N(N-1)$ terms, each with expectation $\E_{F\otimes F}|X-X'|$, and the
+diagonal terms are zero. Dividing by $N(N-1)$ is therefore unbiased, whereas $1/N^2$ would bias the spread term by the factor $(N-1)/N$.
+\end{proof}
+
+\begin{proposition}[Pinball is proper for the quantile]
+For $Y\sim G$ continuous, $q\mapsto\E\rho_\alpha(Y-q)$ is convex with derivative $G(q)-\alpha$, so it is minimised at $q=G^{-1}(\alpha)$.
+\end{proposition}
+\begin{proof}
+$\rho_\alpha(u)=\alpha u^+ +(1-\alpha)u^-$ is convex, so the expectation is convex in $q$. Differentiating under the integral,
+$\frac{d}{dq}\E\rho_\alpha(Y-q)=-\alpha\PP(Y>q)+(1-\alpha)\PP(Y<q)=G(q)-\alpha$.
+\end{proof}
+
+\subsection{Why a ratio loss is not a difference loss}
+
+\begin{proposition}[Lower expected CRPS does not imply a lower expected ratio]\label{prop:counter}
+There exist $F$, $F^0$ and $G$ with $\E_G\CRPS(F,Y)<\E_G\CRPS(F^0,Y)$ but $\E_G[\CRPS(F,Y)/\CRPS(F^0,Y)]>1$.
+\end{proposition}
+\begin{proof}
+Point masses have zero spread term, so $\CRPS(\delta_c,y)=|y-c|$. Let the baseline be $F^0=\delta_0$ and the forecast $F=\delta_1$, and let the
+truth be the two-point law $G=0.8\,\delta_{0.45}+0.2\,\delta_{10}$. Then
+\begin{align*}
+  \E_G\CRPS(F,Y)&=0.8\cdot0.55+0.2\cdot9=2.24,\\
+  \E_G\CRPS(F^0,Y)&=0.8\cdot0.45+0.2\cdot10=2.36,
+\end{align*}
+so $F$ is better in expected CRPS. But
+\begin{equation*}
+  \E_G\Bigl[\frac{\CRPS(F,Y)}{\CRPS(F^0,Y)}\Bigr]=0.8\cdot\frac{0.55}{0.45}+0.2\cdot\frac{9}{10}=1.158>1 .
+\end{equation*}
+\end{proof}
+The mechanism is exactly the one seen in Section~\ref{sec:results}: when the baseline is sharp and right, its small denominator magnifies any
+deviation, and outcomes near the baseline's centre receive large weight. This is what Theorem~\ref{thm:bayes} formalises.
+
+\subsection{The clip}
+
+\begin{lemma}
+For any random variable $X\ge0$, $\E\min(4,X)\le\min(4,\E X)$, and the gap is at most $\E(X-4)^+$.
+\end{lemma}
+\begin{proof}
+$x\mapsto\min(4,x)$ is concave, so Jensen gives the inequality. For the gap, $\min(4,\E X)-\E\min(4,X)\le\E X-\E\min(4,X)=\E(X-4)^+$.
+\end{proof}
+The clip bounds the damage from any single card and makes the loss even more asymmetric: the upside per card is at most about $0.7$, the downside at
+most $3$.
+
+\subsection{Resampling}
+
+\begin{proposition}[Systematic resampling]
+With normalised weights $p_1,\dots,p_M$ and $u\sim U[0,1)$, choose indices $i_k=\min\{i:\sum_{j\le i}p_j>(u+k)/N\}$, $k=0,\dots,N-1$. The number
+$n_i$ of copies of $i$ satisfies $\E n_i=Np_i$ and $n_i\in\{\lfloor Np_i\rfloor,\lceil Np_i\rceil\}$.
+\end{proposition}
+\begin{proof}
+The points $(u+k)/N$ form a grid of spacing $1/N$ with a uniform random offset. The interval $[\sum_{j<i}p_j,\sum_{j\le i}p_j)$ of length $p_i$
+contains either $\lfloor Np_i\rfloor$ or $\lceil Np_i\rceil$ grid points, and in expectation exactly $Np_i$ of them, because the offset is uniform.
+\end{proof}
+Hence the resampled empirical law is an unbiased estimator of $Q_\gamma$ restricted to the pool, with the smallest possible variance per index,
+compared with $Np_i(1-p_i)$ under multinomial resampling.
+
+\begin{proposition}[Effective sample size]
+If $p_i\propto\omega_i$, the variance of the self-normalised importance estimator of a bounded functional is, to first order, that of
+$\mathrm{ESS}=(\sum p_i^2)^{-1}$ i.i.d.\ draws from the target.
+\end{proposition}
+\begin{proof}
+Kong's approximation: the delta method applied to the ratio estimator gives
+\begin{equation*}
+  \Var\approx\frac{\Var_{Q}(f)}{M}\cdot\frac{\E_P[\omega^2]}{(\E_P\omega)^2},\qquad \frac{\E_P[\omega^2]}{(\E_P\omega)^2}\approx M\sum_i p_i^2 .
+\end{equation*}
+\end{proof}
+The implementation rejects $\gamma$ when $\mathrm{ESS}<0.1M$.
+
+\subsection{Variance reduction in the generator}
+
+\begin{proposition}[Stratified scenarios]
+Let the Monte-Carlo estimator of $\E f(\bm Y)$ under a mixture $\sum_j\pi_jP_j$ allocate exactly $N\pi_j$ draws to component $j$. Its variance is
+$\frac1N\sum_j\pi_j\Var_{P_j}(f)$, never larger than the multinomial-allocation variance $\frac1N\Var_{\sum\pi_jP_j}(f)$.
+\end{proposition}
+\begin{proof}
+Law of total variance: $\Var_{\text{mix}}(f)=\sum_j\pi_j\Var_{P_j}(f)+\sum_j\pi_j(\E_{P_j}f-\bar f)^2$. Stratification removes the second, between-component term.
+\end{proof}
+
+\begin{proposition}[Antithetic pairs]
+Pairing each increment vector $\bm\xi$ with $-\bm\xi$ under a shared scenario and mixing variable makes the sample mean of the base layer equal the
+centre exactly, and for any odd functional the Monte-Carlo error is zero.
+\end{proposition}
+\begin{proof}
+The base layer is $\mu+\bm b+\bm c\sqrt W X(\bm\xi)$ with $X$ linear in $\bm\xi$. Summing over a pair cancels the linear term, and an odd functional
+of the centred layer cancels pairwise.
+\end{proof}
+
+\subsection{EWMA volatility}
+
+\begin{lemma}
+The recursion $\hat\sigma^2_t=\lambda\hat\sigma^2_{t-1}+(1-\lambda)x_t^2$ is the weighted average $\sum_{i\ge0}(1-\lambda)\lambda^ix_{t-i}^2$, with
+weights summing to one and centre of mass $\lambda/(1-\lambda)$ steps in the past. With $\lambda=2^{-1/H}$ the weight halves every $H$ steps; for
+$H=30$, $\lambda=0.9772$ and the effective window is about $43$ steps.
+\end{lemma}
+\begin{proof}
+Unroll the recursion. The mean lag is $\sum_i i(1-\lambda)\lambda^i=\lambda/(1-\lambda)$, which for $\lambda=0.9772$ is about $42.8$.
+\end{proof}
+If $x_t$ has constant variance $\sigma^2$, the estimator is unbiased, and its variance is $\frac{1-\lambda}{1+\lambda}\Var(x^2)$, about
+$0.0115\,\Var(x^2)$ for $H=30$: roughly the precision of $87$ independent squared steps, a sensible compromise between reactivity and noise.
+
+\subsection{The variance ratio}
+
+\begin{proposition}
+For a covariance-stationary step process with autocorrelations $\rho_k$,
+\begin{equation}
+  VR(s)=\frac{\Var(\sum_{i=1}^sx_i)}{s\Var(x)}=1+2\sum_{k=1}^{s-1}\Bigl(1-\frac ks\Bigr)\rho_k .
+\end{equation}
+For AR(1) steps with $\rho_k=\phi^k$, $VR(s)\to\frac{1+\phi}{1-\phi}$ as $s\to\infty$.
+\end{proposition}
+\begin{proof}
+$\Var(\sum x_i)=\sum_{i,j}\Cov(x_i,x_j)=s\Var(x)+2\sum_{k=1}^{s-1}(s-k)\rho_k\Var(x)$; divide by $s\Var(x)$. For AR(1) the Ces\`aro-weighted sum
+tends to $\sum_{k\ge1}\phi^k=\phi/(1-\phi)$, giving $1+2\phi/(1-\phi)$.
+\end{proof}
+So $VR>1$ indicates trending steps (momentum) and $VR<1$ mean reversion at the horizon. Since the estimator's standard error scales like
+$\sqrt{s/n}$, the pseudo-count shrinkage \eqref{eq:vr} is the appropriate response to its noise.
+
+\subsection{Isotonic regression}
+
+\begin{proposition}[PAVA]
+The pool-adjacent-violators algorithm returns the Euclidean projection of $\bm y\in\R^n$ onto the monotone cone
+$\{\bm z:z_1\le\dots\le z_n\}$.
+\end{proposition}
+\begin{proof}
+Pooling a violating adjacent pair into its weighted mean never increases the squared distance to any feasible point that is constant on the
+pooled block. The algorithm terminates at a feasible point satisfying the KKT conditions of the convex quadratic program: blocks are level sets,
+and each block value is the mean of its data.
+\end{proof}
+
+\subsection{Termination and safety of the decision layer}
+
+\begin{proposition}
+For a fixed action $(\gamma,\lambda)$ the stepping rule terminates after at most $\lceil4\gamma\rceil+1$ candidates and always returns admissible
+draws.
+\end{proposition}
+\begin{proof}
+Each rejection lowers $\gamma$ by $0.25$, and $\gamma=0$ is accepted unconditionally: it is a plain resample of the honest belief, which already
+passed the spread sanity check. Mixing with M0 draws preserves finiteness and positive spread.
+\end{proof}

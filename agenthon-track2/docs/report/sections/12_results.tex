@@ -1,0 +1,193 @@
+\section{Results}\label{sec:results}
+
+All walk-forward numbers are means of $\Snorm$ over the $3{,}896$ synthetic cards (lower is better; $1$ is M0), with $95\%$ quarter-block bootstrap
+intervals where shown.
+
+\subsection{The ablation ladder}
+
+\begin{center}
+{\small\begin{tabular}{lcccc}
+\toprule
+rung & all cards & $95\%$ CI & as-of $<2015$ & as-of $\ge2015$\\
+\midrule
+M0 replica & $1.0000$ & exact & $1.0000$ & $1.0000$\\
+M1 driftless random walk (M0 width) & $1.0477$ & $[1.018,1.078]$ & $1.032$ & $1.067$\\
+M2 variance term structure & $1.0643$ & $[1.036,1.094]$ & $1.058$ & $1.072$\\
+honest belief of the shipped model ($\gamma=\lambda=0$) & $1.0453$ & $[1.018,1.075]$ & $1.033$ & $1.061$\\
+\textbf{M11 full system (vintaged)} & $\mathbf{0.9680}$ & $\mathbf{[0.952,0.985]}$ & $0.9710$ & $\mathbf{0.9642}$\\
+M11 + PIT calibration (M10) & $0.9707$ & $[0.956,0.991]$ & $0.9660$ & $0.9765$\\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+Three facts stand out. First, the rungs that improve the \emph{honest} forecast (removing M0's noisy drift in M1, conditional volatility in M2)
+make the ratio loss \emph{worse}: $1.048$ and $1.064$. Second, the full system's interval excludes $1$. Third, calibration is rejected
+out of sample.
+
+\paragraph{Anatomy of the honest-belief loss.} Breaking M1 down by template, the mean is inflated by a thin tail of clipped cards on single-asset,
+long-horizon level cards (\code{ust\_single\_long} mean $1.224$, median $1.011$, $95$th percentile $3.05$). In each such case M0's drift, a
+$300$-day trend extrapolated $126$--$189$ steps, happened to land near the outcome while the driftless centre did not. With comparable widths,
+$\CRPS(\text{ours})/\CRPS(\MO)$ then approaches the clip. This is the convexity of Section~\ref{sec:ratio} made visible, and it is why the decision layer
+exists. Retaining M0's drift does not fix it: with drift $\kappa=1$ the honest belief scores $1.035$, with $\kappa=0.5$ it scores $1.024$, because
+the width then differs from M0's instead.
+
+\subsection{The action grid}
+
+On the same belief pools, scoring every $(\gamma,\lambda)$ (the floor not yet enforced):
+\begin{center}
+\begin{tabular}{lccl}
+\toprule
+belief & honest & best action & best score\\
+\midrule
+M1 (M0 width, driftless) & $1.0494$ & $(1.25,0.35)$ & $0.9554$\\
+M2 (term structure, $\omega=0.5$) & $1.0641$ & $(1.50,0.35)$ & $0.9558$\\
+drift $\kappa=0.5$, fat tails, residual bank & $1.0166$ & $(1.00,0.35)$ & $0.9692$\\
+drift $\kappa=1$, fat tails, residual bank & $1.0244$ & $(1.50,0.50)$ & $0.9852$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The decision layer is worth about $0.09$ on the same belief, the dominant effect in the system. Both parameters matter: $\gamma$ alone reaches about
+$0.98$ at the grid edge, and $\lambda$ adds about $0.02$ by capping blow-ups (Theorem~\ref{thm:mix}).
+
+\subsection{Tuning the belief}
+
+One factor at a time around a base. The best fixed action is chosen on train (as-of and outcome before 2015) and the score is reported on test
+(as-of 2015 or later). Round 1 did not enforce the spread floor; round 2 enforces it, with base $\omega=0$.
+\begin{center}
+{\footnotesize\setlength{\tabcolsep}{2.5pt}\begin{tabular}{lcccc|lccc}
+\toprule
+\multicolumn{5}{c|}{round 1 (no floor)} & \multicolumn{4}{c}{round 2 (floor $0.6$)}\\
+variant & action & train & test & honest test & variant & action & train & test\\
+\midrule
+$\omega=0$ & $(1.5,0.2)$ & $\mathbf{0.9409}$ & $0.9618$ & $1.058$ & scale $1.1$ & $(1.0,0.1)$ & $\mathbf{0.9443}$ & $0.9658$\\
+$\phi=0.995$ & $(1.5,0.35)$ & $0.9437$ & $0.9604$ & $1.068$ & \textbf{base} & $(1.25,0.2)$ & $0.9449$ & $0.9665$\\
+$H=15$ & $(1.5,0.2)$ & $0.9440$ & $0.9671$ & $1.072$ & $\phi=0.995$ & $(1.0,0.2)$ & $0.9460$ & $0.9701$\\
+no VR & $(1.25,0.2)$ & $0.9445$ & $0.9712$ & $1.074$ & $H=15$ & $(0.8,0.3)$ & $0.9465$ & $0.9674$\\
+base $\omega=0.5$ & $(1.5,0.2)$ & $0.9449$ & $0.9675$ & $1.071$ & residual bank & $(1.0,0.3)$ & $0.9484$ & $0.9642$\\
+scale $1.1$ & $(1.5,0.2)$ & $0.9452$ & $0.9599$ & $1.082$ & $\nu=12$ & $(1.0,0.3)$ & $0.9509$ & $0.9705$\\
+$\nu=7$ & $(1.5,0.35)$ & $0.9508$ & $0.9738$ & $1.071$ &&&&\\
+$\omega=1$ & $(1.5,0.35)$ & $0.9540$ & $0.9697$ & $1.089$ &&&&\\
+\bottomrule
+\end{tabular}}
+\end{center}
+The variants differ by less than the interval width. We keep the round-2 base: $\omega=0$ (long-run variance anchored at M0's window), EWMA
+current variance, Gaussian, driftless, no residual bank. Choosing the action on test instead of train gives $0.962$ against $0.967$, so the action
+choice is stable rather than overfit. Fat tails ($\nu=7$) are the worst belief variant: under the ratio loss, extra tail mass costs more CRPS on
+ordinary cards than it saves in pinball on surprises.
+
+\subsection{Out-of-sample performance by vintage}
+
+\begin{center}
+\begin{tabular}{lccccc}
+\toprule
+cards (as-of) & parameters & $n$ & mean & median & mean $(\gamma,\lambda)$ used\\
+\midrule
+2003--2008 & priors & $1083$ & $1.006$ & $0.959$ & $(0.50,0.20)$\\
+2009--2014 & vintage $\le$2008 & $1075$ & $\mathbf{0.936}$ & $0.907$ & $(1.24,0.35)$\\
+2015--2024 & vintage $\le$2014 + policy & $1738$ & $\mathbf{0.964}$ & $0.911$ & $(1.22,0.23)$\\
+\bottomrule
+\end{tabular}
+\end{center}
+$0.36\%$ of cards reach the clip. The priors row motivated raising the prior $\lambda$ to $0.4$: with nothing fitted, hedging harder is the
+theory-consistent choice.
+
+\subsection{By family on uniform dates}
+
+\begin{center}
+{\footnotesize\setlength{\tabcolsep}{3pt}\begin{tabular}{lcccc}
+\toprule
+family-shaped template & split & best action & best & at $(1,0.3)$\\
+\midrule
+F1 (long horizons) & $<2015$ / $\ge2015$ & $(1.25,0.4)$ / $(1.75,0.4)$ & $0.973$ / $0.983$ & $0.987$ / $1.017$\\
+F2 ($63$--$64$ BD) & $<2015$ / $\ge2015$ & $(1.0,0.1)$ / $(1.25,0.3)$ & $0.910$ / $0.935$ & $0.917$ / $0.936$\\
+F3 (joint) & $<2015$ / $\ge2015$ & $(1.25,0.2)$ / $(1.25,0.4)$ & $0.940$ / $0.960$ & $0.944$ / $0.962$\\
+F4 ($21$ BD) & $<2015$ / $\ge2015$ & $(1.0,0.2)$ / $(1.0,0.2)$ & $0.953$ / $0.937$ & $0.954$ / $0.940$\\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+\subsection{Stress windows (M12)}
+
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+window & $n$ & M1 & M11 & M11 $90$th pct.\\
+\midrule
+GFC (2008-06 to 2009-06) & $208$ & $1.011$ & $1.013$ & $1.360$\\
+taper (2013-04 to 2013-12) & $140$ & $1.012$ & $0.954$ & $1.142$\\
+COVID (2020-01 to 2020-07) & $105$ & $1.049$ & $0.985$ & $1.438$\\
+hikes (2022) & $177$ & $1.326$ & $1.062$ & $1.375$\\
+worst decile of $|z_{\MO}|$ & $389$ & $0.970$ & $1.053$ & ---\\
+\bottomrule
+\end{tabular}
+\end{center}
+The system is weakest precisely where outcomes are far from M0's centre. Sharpening toward M0 costs most when M0 is badly wrong, and uniform-date
+validation undersamples those cards.
+
+\subsection{Event-selected practice cards}
+
+On the practice units (realised values reconstructed from the published history; evaluation only):
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+family & $n$ & best action (2024-vintage belief) & best & generic action $(1,0.3)$\\
+\midrule
+F1 & $18$ & $(1.25,0)$ & $0.871$ & $0.906$\\
+F2 & $23$ & $(0.5,0.8)$ & $0.993$ & $1.035$\\
+F3 & $20$ & $(0.5,0.3)$ & $0.937$ & $0.942$\\
+F4 & $29$ & $(0,0.8)$ & $1.010$ & $1.085$\\
+\bottomrule
+\end{tabular}
+\end{center}
+F1's preference for $(1.25,0)$ contradicts the $394$ uniform-date F1-shaped cards, where that action scores $1.066$, so it was not adopted. For
+F4, widening the belief is robust across actions: at scale $\times1.4$ the score is $0.968$--$0.973$ for every $\lambda$, and $0.973$ even for the
+honest belief. For F2 the results are unstable (one combination reaches $0.922$ while its neighbours sit near $0.99$). These family blocks
+(F4: $\times1.35$, action $(0,0.3)$; F2: $\times1.2$, action $(0.5,0.5)$; policy off) enter \emph{only} the 2024 vintage, because they were chosen
+on outcomes up to 2024.
+
+\paragraph{Text on practice cards (offline).} With the lexicon fallback only (no House endpoint off-platform), the numeric-only system scores
+$1.0048$ and the text-on system $1.0038$ ($\Delta_{\text{text}}=+0.001$, helping on $17\%$ of cards). This is neutral, as designed for a capped fallback.
+
+\subsection{The official Development submission}
+
+The first Development upload (v1.0.1) was scored on $71$ cards, all admissible, with primary score $\mathbf{0.9782}$.
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+family & $n$ & mean & median & share below $1$\\
+\midrule
+F1 & $18$ & $0.895$ & $0.881$ & $83\%$\\
+F2 & $15$ & $0.965$ & $0.938$ & $67\%$\\
+F3 & $16$ & $0.947$ & $0.893$ & $63\%$\\
+F4 & $22$ & $1.078$ & $1.060$ & $32\%$\\
+\bottomrule
+\end{tabular}
+\end{center}
+\paragraph{Fidelity.} On the $65$ cards that the local evaluator can reconstruct, the official per-card scores and the local ones correlate at
+$0.912$. The offline methodology tracks the official scorer.
+
+\paragraph{The language model's contribution.} The official run called the House model and the local run could not, so the paired difference estimates
+the LLM effect: $-0.0095$, with $95\%$ bootstrap interval $[-0.026,+0.009]$, better on $54\%$ of cards. This is consistent with a small benefit and
+also with none. Text influence was therefore left unchanged.
+
+\paragraph{The Final configuration on the same cards.} The Development cards are dated 2003--2024 and therefore use the 2008/2014 vintages, without the
+F2/F4 blocks. Evaluated locally with the 2024 vintage and its family blocks (text off, hence conservative):
+F1 $0.884$, F2 $0.957$, F3 $0.943$, F4 $1.006$, overall $\mathbf{0.952}$ against $0.983$ for the same cards under the Development configuration. The F2/F4
+part of this estimate is in-sample and therefore optimistic.
+
+\subsection{Robustness of the text path}
+
+A fake House client returning adversarial answers on all $104$ practice units:
+\begin{center}
+{\small\begin{tabular}{p{0.34\textwidth}ccc}
+\toprule
+answer & admissible & path (full / numeric-only) & max sd/M0 sd (med., max)\\
+\midrule
+extreme (confidence $1$, extreme magnitude, both tails, $3$ scenarios, established) & $104/104$ & $102$ / $2$ & $1.71$, $3.55$\\
+contradictory & $104/104$ & $102$ / $2$ & $1.11$, $3.55$\\
+garbage (not JSON) & $104/104$ & $104$ / $0$ (lexicon) & $0.89$, $3.55$\\
+\bottomrule
+\end{tabular}}
+\end{center}
+The two numeric-only cases are the INR transfer cards, whose numeric belief is already about $3.5\times$ M0's scale. There the extreme text pushed
+the spread beyond the $8\times$ sanity bound, and the update was rejected while the numeric forecast was kept.

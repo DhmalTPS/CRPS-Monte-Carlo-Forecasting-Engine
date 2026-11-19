@@ -1,0 +1,95 @@
+\section{Fusion: gating, contradiction and the distribution update}\label{sec:fusion}
+
+\subsection{Contradiction (L16)}
+
+For asset $a$ with text view $t_a=2p^\uparrow_a-1\in[-1,1]$, numeric trend $z$-score $m_a$ and model confidence $C$,
+\begin{equation}
+  \kappa_a = C\,|t_a|\;\ind\{\sgn t_a\ne\sgn m_a\}\;\min\bigl(1,|m_a|/1.5\bigr),\qquad \kappa=\overline{\kappa_a}\in[0,1].
+\end{equation}
+A confident text view against a clear numeric trend counts most, and an unsure view or a flat trend contradicts little. Contradiction is never
+resolved in favour of one source: it lowers the gate and widens the distribution.
+
+\subsection{The information gate (L15)}
+
+\begin{equation}\label{eq:gate}
+  g=\min\Bigl\{g_{\max},\ \sigma\bigl(w_0+\delta_f+|w_1|\,q+|w_2|\,C+|w_3|\log(1+c_{\max})-|w_4|\,\kappa\bigr)\cdot\theta_f\cdot a\Bigr\},
+\end{equation}
+where $q\in[0,1]$ is the retrieval quality (the top-$3$ scores relative to the maximum), $c_{\max}$ the largest corroboration among retrieved
+passages, $\delta_f$ the family intercept shift, $\theta_f$ the family text strength, $a$ the policy's action multiplier and $g_{\max}=0.85$. The
+defaults are $w_0=-1.2$, $w_1=1.1$, $w_2=2.2$, $w_3=0.35$, $w_4=1.4$, with $(\delta,\theta)=(-0.3,0.8),(0.4,1.0),(0,0.8),(0.2,0.9)$ for F1--F4.
+Hard rules: a neutral signal or an empty retrieval set gives $g=0$ \emph{exactly}; a lexicon-sourced signal is capped at $g\le0.25$.
+
+\begin{proposition}[Monotonicity]\label{prop:gate}
+$g$ is non-decreasing in $q$, $C$ and $c_{\max}$, non-increasing in $\kappa$, and $g\in[0,g_{\max}]$.
+\end{proposition}
+\begin{proof}
+The logistic function is increasing; the argument is non-decreasing in $q,C,c_{\max}$ and non-increasing in $\kappa$, because the coefficients
+enter through absolute values. Multiplication by $\theta_fa\ge0$ and the cap $\min\{g_{\max},\cdot\}$ preserve monotonicity, and all factors are
+non-negative.
+\end{proof}
+The absolute values replace the softplus reparametrisation of the design document: an unconstrained fit on a handful of cards could otherwise learn
+a sign-flipped relation that happens to fit noise. The weights are priors, not fitted. With no House endpoint off-platform there is no dataset on
+which $w$ could be estimated without look-ahead (Section~\ref{sec:limitations}).
+
+\subsection{The distribution update (L18)}
+
+Let $\sigma_c$ be the base standard deviation of cell $c$ and $m(\cdot)$ the \emph{semantic-to-empirical} magnitude map, anchored on quantiles of
+$|z|$ for standardised moves: $m(\text{weak})=0.674$, $m(\text{moderate})=1.150$, $m(\text{strong})=1.645$, $m(\text{extreme})=2.326$, the
+$50$/$75$/$90$/$98$\% points of $|\mathcal N(0,1)|$. When the in-unit residual bank is enabled these are averaged half-and-half with the unit's own
+empirical $|z|$ quantiles. Persistence enters as
+\begin{equation}
+  f_{\mathrm{pers}}(s)=\begin{cases}\sqrt{\min(1,21/s)} & \text{transient}\\ \sqrt{\min(1,63/s)} & \text{medium}\\ 1 & \text{persistent.}\end{cases}
+\end{equation}
+
+\paragraph{Mechanism A (tilt).} With $\alpha=0.25\,\theta_f$, $\beta=0.30$, $\lambda_\kappa=0.15$ and the volatility codes
+$v(\text{lower})=-\tfrac12$, $v(\text{same})=0$, $v(\text{higher})=1$, $v(\text{much\_higher})=2$,
+\begin{align}
+  \mu_{1,c} &= \mu_{0,c}+g\,\alpha\,(2p^\uparrow_{a}-1)\,m(m_a)\,f_{\mathrm{pers}}(s_c)\,\sigma_c, \label{eq:tilt-mu}\\
+  \sigma_{1,c} &= \sigma_{0,c}\,\exp\Bigl(\min\bigl\{g\beta\,v^\star_a+\lambda_\kappa\kappa\sqrt g,\ \log 2\bigr\}\Bigr), \label{eq:tilt-s}
+\end{align}
+where $v^\star_a=\max(v_a,0)$ unless the driver is \emph{established}. Inferred tone may move the centre but may not narrow.
+
+\begin{proposition}[Validity and exact reduction]\label{prop:tilt}
+(i) $\sigma_{1,c}>0$ whenever $\sigma_{0,c}>0$. (ii) If $g=0$ then $(\mu_1,\sigma_1)=(\mu_0,\sigma_0)$ exactly. (iii) $\sigma_{1,c}\le2\,\sigma_{0,c}$.
+(iv) $|\mu_{1,c}-\mu_{0,c}|\le g\,\alpha\,m(\text{extreme})\,\sigma_c\le 0.85\cdot0.25\cdot2.326\,\sigma_c\approx0.49\,\sigma_c$.
+\end{proposition}
+\begin{proof}
+(i) $\exp(\cdot)>0$. (ii) Every term in the exponent and the shift carries a factor $g$ or $\sqrt g$. (iii) The exponent is capped at $\log2$.
+(iv) $|2p-1|\le1$, $f_{\mathrm{pers}}\le1$, $\theta_f\le1$ and $g\le g_{\max}$.
+\end{proof}
+The multiplicative form excludes an entire class of invalid states: an additive $\sigma_1=\sigma_0+\Delta$ can become non-positive under a confident
+but wrong signal. The cap and the reduced $\alpha$ (from $0.35$) are the result of the audit in Section~\ref{sec:engineering}. Under the convex ratio loss a
+centre shift of about $0.57\sigma$, the old worst case, is too costly when the text is wrong.
+
+\paragraph{Mechanism B (mixture).} When the model describes at least two branching scenarios, or $\kappa>\kappa^\star=0.55$, the belief becomes
+\begin{equation}\label{eq:mixture}
+  P_1=(1-g)\,P_0^{(\sigma_1)}+g\sum_{s}\pi_s\,P_s,
+\end{equation}
+where component $P_s$ shifts cell $c$ by $d_{s,a}\,m(m_s)\,f_{\mathrm{pers}}(s_c)\,\sigma_c\min(1,1.5\alpha)$ and scales it by
+$\min\{e^{\beta v^\star_s},2\}\,\sigma_{1,c}$,
+where $P_0^{(\sigma_1)}$ is the prior with the widened scale.
+
+\begin{proposition}\label{prop:mix}
+For $g\in[0,1]$ and densities $P_0,P_s$, \eqref{eq:mixture} is a probability density, and $P_1=P_0^{(\sigma_1)}=P_0$ at $g=0$.
+\end{proposition}
+\begin{proof}
+It is a non-negative combination with weights $(1-g)+g\sum_s\pi_s=1$, because the coerced scenario probabilities are renormalised to sum to one.
+Integrating gives $1$ by linearity. At $g=0$ only the first term remains, and $\sigma_1=\sigma_0$ by Proposition~\ref{prop:tilt}(ii).
+\end{proof}
+Each draw selects one scenario applied to \emph{all} cells, so a scenario is a coherent joint story ("the central bank blinks") rather than a
+per-cell coin flip. This is what makes text useful for the variogram term.
+
+\paragraph{Event-triggered one-sided tail (L20, F4-weighted).} If any asset's tail flag is set, a component of weight
+\begin{equation}
+  w_{\mathrm{tail}}=\min\bigl\{0.25,\ g\cdot0.12\cdot\theta^{\mathrm{tail}}_f\cdot(1\text{ if strong or established else }\tfrac12)\bigr\}
+\end{equation}
+is added, with scale $2.2\,\sigma_1$ and shift $\pm m(\text{strong})\,\sigma_c$ toward the flagged side (no shift for "both"). The other weights are
+multiplied by $1-w_{\mathrm{tail}}$. This targets the $1\%$ and $99\%$ pinball points directly instead of widening the whole distribution, which
+would cost CRPS on ordinary days.
+
+\subsection{The semantic-to-numeric map as a bottleneck}
+
+The LLM's output enters the distribution only through the finite set of categorical fields above and the bounded probabilities $p^\uparrow$, $\pi_s$
+and $C$. Numbers are produced by the panel ($\sigma_c$) and by fixed maps ($m$, $f_{\mathrm{pers}}$, $v$). This low-dimensional bottleneck is what
+makes the text component auditable and bounded (Proposition~\ref{prop:tilt}), and it is the defence against an open model's miscalibrated
+numerical intuition.

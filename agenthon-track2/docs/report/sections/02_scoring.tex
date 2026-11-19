@@ -1,0 +1,87 @@
+\section{The scoring rule, exactly}\label{sec:scoring}
+
+\subsection{Components}
+
+Let $\hat F$ denote the empirical law of the $N$ submitted draws $\{\bm x^{(k)}\}$ and $\bm y\in\R^D$ the realised vector.
+
+\paragraph{Marginal CRPS.} For one cell with draws $x_1,\dots,x_N$,
+\begin{equation}\label{eq:crps}
+  \CRPS(\hat F,y) \;=\; \frac1N\sum_{k}|x_k-y| \;-\; \frac{1}{2N(N-1)}\sum_{k,l}|x_k-x_l|,
+\end{equation}
+the \emph{fair} (almost unbiased) ensemble estimator; the marginal component is the mean over the $D$ cells.
+
+\begin{lemma}[Sorted-sum identity]\label{lem:sorted}
+If $x_{(1)}\le\dots\le x_{(N)}$ then $\sum_{k,l}|x_k-x_l|=2\sum_{i=1}^N(2i-N-1)\,x_{(i)}$.
+\end{lemma}
+\begin{proof}
+Each unordered pair $i<j$ contributes $x_{(j)}-x_{(i)}$ twice. In $\sum_{i<j}(x_{(j)}-x_{(i)})$ the element $x_{(i)}$ appears with sign $+$ in
+$i-1$ pairs and with sign $-$ in $N-i$ pairs, so its coefficient is $(i-1)-(N-i)=2i-N-1$.
+\end{proof}
+The identity gives $O(N\log N)$ evaluation. For $K$ hypothetical outcomes at once we also need the first term fast: with prefix sums
+$c_j=\sum_{i\le j}x_{(i)}$ and $k=\#\{i:x_{(i)}<y\}$,
+\begin{equation}
+  \sum_i|x_i-y| \;=\; (yk-c_k) + \bigl(c_N-c_k-y(N-k)\bigr),
+\end{equation}
+so each outcome costs a binary search. This is how the decision layer scores thousands of candidate outcomes per card.
+
+\paragraph{Variogram score of order $p=\tfrac12$.} With unit weights over \emph{all ordered} pairs of cells,
+\begin{equation}\label{eq:vs}
+  \VS(\hat F,\bm y) \;=\; \sum_{i,j=1}^{D}\Bigl(|y_i-y_j|^{p}-\E_{\hat F}|X_i-X_j|^{p}\Bigr)^2 .
+\end{equation}
+Pairs include the same asset at two horizons and different assets at different horizons, so both cross-asset and cross-horizon geometry
+are scored.
+
+\begin{proposition}[What the variogram rewards]\label{prop:vs-opt}
+For fixed truth $\bm Y\sim P$, $\E_P\VS(F,\bm Y)$ is minimised over forecasts $F$ exactly when
+$\E_F|X_i-X_j|^p=\E_P|Y_i-Y_j|^p$ for every pair; the minimum equals $\sum_{i,j}\Var_P(|Y_i-Y_j|^p)$.
+\end{proposition}
+\begin{proof}
+For each pair, $\E_P(U-c)^2$ with $U=|Y_i-Y_j|^p$ and constant $c=\E_F|X_i-X_j|^p$ equals $\Var U+(\E U-c)^2$, minimised at $c=\E U$.
+The pairs decouple.
+\end{proof}
+Hence VS is proper but not strictly proper: it scores only the $p$-th moments of pairwise distances. Two consequences follow. First, a
+common location shift of all cells does not change VS, which makes it complementary to CRPS. Second, independent sampling across
+assets inflates $\E|X_i-X_j|^p$ for positively dependent pairs, and is penalised.
+
+\paragraph{Tail pinball penalty.} With $\hat q_\alpha$ the empirical (linear-interpolation) $\alpha$-quantile of a cell,
+\begin{equation}\label{eq:pb}
+  \PB(\hat F,\bm y) \;=\; \frac{1}{|\mathcal L|\,D}\sum_{\alpha\in\mathcal L}\sum_{i=1}^{D}\rho_\alpha\bigl(y_i-\hat q_{\alpha,i}\bigr),\qquad
+  \rho_\alpha(u)=u\bigl(\alpha-\ind\{u<0\}\bigr).
+\end{equation}
+
+\subsection{Composite and per-card normalisation}
+
+Write $\bm S(F,\bm y)=(S_m,S_j,S_t)$ for the three raw components and $\bm S^{0}(\bm y)$ for those of the baseline M0 on the same card and
+outcome. The leaderboard statistic of a card is
+\begin{equation}\label{eq:snorm}
+  \Snorm(F,\bm y) \;=\; \min\!\Biggl\{4,\ \sum_{k\in\{m,j,t\}} \tilde w_k\,\frac{S_k(F,\bm y)}{\bar S^{0}_k(\bm y)}\Biggr\},
+  \qquad \bar S^0_k = \begin{cases} S^0_k & S^0_k>0\\ 1 & S^0_k\le 0,\end{cases}
+\end{equation}
+where on a single-cell card the variogram is identically $0$ and the weights are renormalised to
+$\tilde{\bm w}=(0.5/0.7,\,0,\,0.2/0.7)=(0.714,0,0.286)$; otherwise $\tilde{\bm w}=\bm w$. The ranking is the equal-weight mean of
+$\Snorm$ over cards, lower is better, and an inadmissible, erroring or unattempted card counts as $4$.
+
+\begin{remark}
+Three properties of \eqref{eq:snorm} drive everything that follows.
+(a) The denominator is a random variable: the baseline's error \emph{on this particular outcome}.
+(b) The statistic is bounded below by $0$ and above by $4$, but the ratio of a good forecast to M0 is rarely below about $0.3$, while it can
+reach $4$ on cards where M0 is sharp and right. The per-card loss is therefore strongly asymmetric.
+(c) The mean over cards of a ratio is not the ratio of means; heterogeneous cards are averaged on one scale because each is normalised
+by its own baseline.
+\end{remark}
+
+\subsection{Implementation parity}
+
+The system reimplements all three components in vectorised form (\code{agenthon.decision.m0\_scoring}) so that one forecast can be scored
+against $K$ outcomes at once. Parity against the official \code{qfbench2\_common} and track modules was checked on random inputs:
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+component & $\max|\text{ours}-\text{official}|$\\
+\midrule
+marginal CRPS & $3.3\times10^{-16}$\\
+variogram ($p=\tfrac12$) & $0$\\
+pinball (mean over levels and cells) & $0$\\
+\bottomrule
+\end{tabular}
+\end{center}

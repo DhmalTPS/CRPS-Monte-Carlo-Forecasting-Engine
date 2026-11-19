@@ -1,0 +1,56 @@
+# Whitelist: ignore everything at the root, then re-include the chosen paths.
+/*
+!/.gitignore
+!/README.md
+!/agenthon-track2/
+
+# --- agenthon-track2: top level ---
+/agenthon-track2/*
+!/agenthon-track2/.dockerignore
+!/agenthon-track2/.gitignore
+!/agenthon-track2/AGENTS.md
+!/agenthon-track2/ARTIFACT_PROVENANCE.md
+!/agenthon-track2/Dockerfile
+!/agenthon-track2/README.md
+!/agenthon-track2/pyproject.toml
+!/agenthon-track2/requirements.txt
+!/agenthon-track2/configs/
+!/agenthon-track2/prompts/
+!/agenthon-track2/src/
+!/agenthon-track2/tests/
+!/agenthon-track2/scripts/
+!/agenthon-track2/docs/
+!/agenthon-track2/offline/
+!/agenthon-track2/submission/
+
+# --- src: package only (no egg-info) ---
+/agenthon-track2/src/*
+!/agenthon-track2/src/agenthon/
+
+# --- offline: code, manifests and small result tables; no data or run files ---
+/agenthon-track2/offline/data/*
+!/agenthon-track2/offline/data/README.md
+!/agenthon-track2/offline/data/build_history.py
+!/agenthon-track2/offline/data/manifests/
+/agenthon-track2/offline/experiments/runs/
+/agenthon-track2/offline/experiments/configs/
+
+# --- submission: image wrappers and template only (no team descriptors, no zips) ---
+/agenthon-track2/submission/*
+!/agenthon-track2/submission/Dockerfile
+!/agenthon-track2/submission/entrypoint.sh
+!/agenthon-track2/submission/run.sh
+!/agenthon-track2/submission/submission.template.json
+
+# --- never ---
+__pycache__/
+*.pyc
+*.parquet
+*.zip
+*.egg-info/
+.pytest_cache/
+.venv*/
+team_key*
+team-key*
+*.env
+.env*

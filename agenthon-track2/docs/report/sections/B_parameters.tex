@@ -1,0 +1,45 @@
+\section{Parameters}\label{app:params}
+
+Built-in defaults are \emph{priors}: no value in this table was fitted, unless the table says it was. Fitted values live in the vintaged artifacts.
+
+\begin{center}
+\small
+\begin{longtable}{p{0.33\textwidth}p{0.17\textwidth}p{0.42\textwidth}}
+\toprule
+parameter & value & role / provenance\\
+\midrule
+\endhead
+M0 window, draws, override ratio & $300$, $500$, $2$ & official specification\\
+EWMA half-life $H$ & $30$ BD & prior\\
+long window $L$ & $1260$ BD & prior\\
+long-run blend $\omega$ & $0.5$ prior; $0$ fitted & vintages $\le$2014, $\le$2024 (tuning round 1)\\
+persistence $\phi$ & $0.985$ / BD & prior (half-life about $46$ BD)\\
+global scale $c$ & $1.0$ & prior; within noise in tuning\\
+VR pseudo-count, clip & $40$; $[0.6,1.6]$ & prior\\
+drift shrink (level / return) & $0$ / $0.25$ prior; $0$ / $0$ fitted & ratio convexity\\
+scale-mixture dof $\nu$ & $12$ prior; $\approx\infty$ fitted & fat tails rejected\\
+correlation blend $\eta$ & $0.15$ & prior\\
+soft floor $f_0$, $k$ & $-0.10$, $0.25$ & UST only\\
+macro trend half-life, weight & $6$ months, $0.7$ & prior\\
+transfer blend, EM premium & $0.5$, $1.25$ & judgement\\
+regime thresholds, slope & $0.8$, $1.35$, $k=8$ & prior\\
+residual bank & off & no robust gain\\
+passage size, top-$k$, budget & $900$, $12$, $14{,}000$ chars & engineering\\
+dedup Jaccard, window & $0.55$, $5$ days & prior\\
+BM25 $k_1$, $b$; recency half-life & $1.4$, $0.75$; $45$ days & standard\\
+retrieval weights (rec, asset, nov, type) & $0.6$, $0.8$, $0.3$, $0.4$ & prior\\
+LLM calls, retries, max tokens, temperature & $3$, $1$, $1800$, $0$ & budget discipline\\
+gate $(w_0,\dots,w_4)$ & $-1.2$, $1.1$, $2.2$, $0.35$, $1.4$ & prior (no labelled text)\\
+gate cap, lexicon cap & $0.85$, $0.25$ & prior\\
+family $(\delta_f,\theta_f)$ & F1 $(-0.3,0.8)$, F2 $(0.4,1)$, F3 $(0,0.8)$, F4 $(0.2,0.9)$ & prior\\
+update $\alpha,\beta,\lambda_\kappa,\kappa^\star$ & $0.25$, $0.30$, $0.15$, $0.55$ & prior; $\alpha$ reduced in audit\\
+text vol cap & $2\times$ & audit\\
+tail weight max, tail scale & $0.12$, $2.2$ & prior\\
+decision $(\gamma,\lambda)$ & prior $(0.5,0.4)$; $\le$2008 $(1.25,0.35)$; $\le$2014 $(1.25,0.2)$; $\le$2024 $(1.0,0.3)$ & fitted per vintage\\
+F4 / F2 blocks ($\le$2024 only) & $\times1.35$, $(0,0.3)$ / $\times1.2$, $(0.5,0.5)$ & practice cards (in-sample)\\
+spread floor, ESS floor & $0.6$, $0.1M$ & honesty constraints\\
+policy ridge, pessimism & $100$, $2$ & fitted per vintage; OOS evidence\\
+belief pool, evaluation outcomes, $N$ & $6000$, $3000$, $2000$ ($4000$ F4) & Monte-Carlo accuracy\\
+\bottomrule
+\end{longtable}
+\end{center}

@@ -1,0 +1,27 @@
+AS-OF DATE: {asof}
+CARD: {title}
+AUTHORED TASK NOTES (what this card is about; not evidence about the outcome):
+{notes}
+
+TARGETS AND QUOTE CONVENTIONS (direction always refers to the numeric VALUE as quoted):
+{conventions}
+
+HORIZONS (business days after the as-of): {horizons}
+
+NUMERIC STATE (computed from the panels, up to the as-of):
+{numeric_state}
+
+DOCUMENTS (most relevant passages, deduplicated, oldest first; cite by doc_id):
+{evidence}
+
+TASK
+For each target asset give:
+  p_up       probability the value at the horizon is ABOVE a no-change random-walk centre (0..1)
+  magnitude  none | weak | moderate | strong | extreme   (size of the implied move vs normal volatility)
+  vol_view   lower | same | higher | much_higher         (uncertainty vs recent realised volatility)
+  tail_side  none | up | down | both                     (which extreme the documents make more likely)
+Then, ONLY if the documents describe a genuine branching outcome inside the horizon (a pending decision, a peg that may break, a vote), up to 3 scenarios whose probabilities sum to 1, each with a direction per asset (-1, 0 or +1), a magnitude class and a vol_view. Otherwise return an empty scenarios list.
+Also: persistence (transient | medium | persistent), regime_evidence (supports_calm | neutral | supports_stress), confidence (0..1), novelty (0..1, how much the documents say that the numeric trend does not already reflect), established (true/false), cited_docs (doc_ids you relied on), summary (at most 60 words).
+
+Return exactly one JSON object with these keys:
+{schema}

@@ -1,0 +1,9 @@
+# Development profile: faster local iteration, fewer draws, LLM off unless an endpoint exists.
+runtime:
+  profile: development
+  total_seconds: 600
+sampling:
+  n_default: 1000
+  belief_pool: 4000
+decision:
+  eval_outcomes: 2000

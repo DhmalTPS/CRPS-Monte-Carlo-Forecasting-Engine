@@ -1,0 +1,27 @@
+\section{Reproduction}\label{app:repro}
+
+All commands run from the repository root \path|agenthon-track2|. The practice units live in the organizers' public repository.
+
+\begin{enumerate}[leftmargin=*]
+\item Rebuild history: \path|python offline/data/build_history.py --units <units> --out offline/data|.
+\item Generate cards: \path|python offline/walk_forward/generate_cutoffs.py| ($3{,}896$ cards).
+\item Sanity rung: \path|python -m offline.ablations.M0_baseline 8| (must print $1.0000$).
+\item Ladder: \path|python -m offline.ablations.M1_random_walk 8|, \path|... M2_statistical 8|.
+\item Tuning: \path|python offline/experiments/tune.py --prefix R2_ --base '{"numerical":{"lr_omega":0.0}}'|.
+\item Policy: \path|python offline/rl/train_policy.py --run R2_base|.
+\item Production-exact walk-forward: \path|python offline/walk_forward/run.py --name M11_full --overrides '{"_vintaged": true}'|.
+\item Calibration ablation: \path|python offline/experiments/fit_calibration.py --run M11_full|.
+\item Practice evaluation: \path|python offline/walk_forward/practice_eval.py --rung M11_full|;
+      family actions: \path|python offline/walk_forward/practice_actions.py|.
+\item Tables: \path|python offline/walk_forward/aggregate.py M0_baseline M1_random_walk M11_full --save ablation_ladder|;
+      stress: \path|python offline/walk_forward/stress.py M11_full|.
+\item Tests: \path|python -m pytest| ($84$ tests). Official gates on all units: \path|python scripts/run_local.py --units <units> --no-llm| then
+      \path|python scripts/validate_submission.py --units <units> --outputs artifacts/forecasts|.
+\item Container: \path|docker build --platform linux/amd64 -t agenthon-t2:1.0.1 .| and
+      \path|powershell -File scripts/docker_smoke.ps1 -All| ($104/104$).
+\item Adversarial LLM stress: \path|python scripts/llm_stress.py --units <units> --mode extreme|.
+\end{enumerate}
+
+\paragraph{Submitted artifact.} Image \path|docker.io/tps3108/agenthon-t2|, linux/amd64 digest
+\path|sha256:00e0ee761cdbabca422156a3bfb096bdddd35783d3fb98dfb09fbafa2a0b98bb|, disclosed House model
+\path|nvidia/nemotron-3-super-120b-a12b| (\path|rl-030326-fp8|, training cutoff unpublished).

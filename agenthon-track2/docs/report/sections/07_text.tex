@@ -1,0 +1,92 @@
+\section{The text branch: from documents to a structured signal}\label{sec:text}
+
+The text branch runs independently of the numerical branch and communicates with it through one narrow interface, the triple $(Z,g,\kappa)$. It
+uses no neural weights: passages, dictionaries and a BM25 index are built at run time from \emph{this unit's} corpus only, so nothing can leak
+across units.
+
+\subsection{Events (L8)}
+
+Each document is split into paragraph blocks, packed greedily into passages of at most $900$ characters (longer paragraphs are cut). A passage
+$e$ is kept if it contains any market vocabulary. With counts $h_e,d_e$ of hawkish and dovish phrases, $u_e$ of stress terms and $\tau_e$ of
+explicit tail terms (all from static dictionaries),
+\begin{equation}
+  \text{tone}_e=\frac{h_e-d_e}{h_e+d_e+2}\in(-1,1),\qquad \text{stress}_e=\min(1,u_e/6).
+\end{equation}
+The $+2$ is a Laplace-type pseudo-count that keeps a single phrase from saturating the tone. Assets touched are those whose vocabulary appears.
+
+\subsection{Deduplication (L9)}
+
+Let $\mathcal S_e$ be the set of hashed word $5$-grams of $e$. Two passages from different documents are merged iff
+\begin{equation}
+  J(e,e')=\frac{|\mathcal S_e\cap\mathcal S_{e'}|}{|\mathcal S_e\cup\mathcal S_{e'}|}\ge\theta=0.55
+  \quad\text{and}\quad |t_e-t_{e'}|\le 5\ \text{days}.
+\end{equation}
+Clusters are the connected components of this relation (union-find over a time-sorted sweep, $O(n\cdot w)$ for window population $w$). A
+cluster's corroboration is the number $c$ of distinct documents in it, and its novelty weight is $\nu=1/(1+\log c)$. Requiring both semantic and
+temporal proximity keeps a topic recurring months apart as two events. Without deduplication, $k$ wire copies of one statement would look like
+$k$ independent confirmations and inflate the confidence the gate relies on.
+
+\subsection{State-conditioned query and retrieval (L10--L11)}
+
+The query is built from the numerical state, not from "recent news": the vocabulary of the target assets, stress and tail vocabulary when
+$\pi_{\text{stress}}>0.4$, and content words from the card's own authored title, description and notes (a legitimate input file). BM25 with
+$k_1=1.4$, $b=0.75$ scores unigram terms:
+\begin{equation}
+  \mathrm{BM25}(e)=\sum_{t\in q}\mathrm{idf}(t)\,\frac{f_{t,e}(k_1+1)}{f_{t,e}+k_1\bigl(1-b+b\,|e|/\overline{|e|}\bigr)},\quad
+  \mathrm{idf}(t)=\log\Bigl(1+\frac{N-n_t+0.5}{n_t+0.5}\Bigr),
+\end{equation}
+plus $1.5$ per matched multi-word phrase. With $\mathrm{rel}_e=\mathrm{BM25}(e)/\max_{e'}\mathrm{BM25}(e')$, the final score merges the five
+retrieval channels of the reference designs into one:
+\begin{equation}\label{eq:retr}
+  \mathrm{score}(e)=\mathrm{rel}_e+\sqrt{\mathrm{rel}_e}\Bigl[0.6\,e^{-\lambda\,\mathrm{age}_e}+0.8\,\mathrm{match}_e+0.3\,\nu_e+0.4\,w_{\mathrm{type}(e)}\Bigr],
+\end{equation}
+with half-life $45$ days, $\mathrm{match}_e$ the fraction of target assets touched, and source-type weights (FOMC statement $1.0$, testimony and
+minutes $0.8$, speeches $0.6$, \ldots). The factor $\sqrt{\mathrm{rel}_e}$ was introduced after a test exposed a real flaw: with purely additive
+terms, a recent passage of zero relevance outranked a relevant older one. Now recency, asset match, novelty and source type can re-order relevant
+passages but cannot lift an irrelevant one, since the score is $0$ when BM25 is $0$.
+
+\subsection{Diversity and budget (L12)}
+
+Maximal marginal relevance selects up to $12$ passages within $14{,}000$ characters:
+\begin{equation}
+  e^\star=\argmax_{e\notin\mathcal C}\ \Bigl[0.7\,\mathrm{score}(e)-0.3\cdot3\max_{e'\in\mathcal C}J_1(e,e')\Bigr],
+\end{equation}
+with unigram Jaccard $J_1$. Each passage is compressed to whole sentences within its share of the budget. Redundancy is a property of a
+\emph{set}, so this is where the redundancy term of the reference retrieval score belongs.
+
+\subsection{One structured call (L13)}
+
+The House model receives the as-of date, the card's authored notes, the quote convention of every target (for example "EUR: US dollars per
+1 EUR; up = EUR strengthens", "JPY: JPY per 1 US dollar; up = JPY weakens"), the horizons, a compact numeric state (last value, trend $z$, vol ratio,
+regime probabilities) and the compressed evidence with document identifiers. It is instructed to use only that information set and to ignore any
+recognition of the episode, and it is asked for
+\begin{multline}
+  Z=\Bigl(\{p^{\uparrow}_a,\ m_a,\ v_a,\ \text{tail}_a\}_{a\in\mathcal A},\ \{(\text{name}_s,\pi_s,\bm d_s,m_s,v_s)\}_{s\le3},\\
+  \text{persistence},\ \text{regime},\ C,\ \nu,\ \text{established},\ \text{cited}\Bigr),
+\end{multline}
+with $p^\uparrow_a\in[0,1]$ the probability of ending above the numeric centre, $m_a\in\{$none, weak, moderate, strong, extreme$\}$,
+$v_a\in\{$lower, same, higher, much\_higher$\}$ and $\text{tail}_a\in\{$none, up, down, both$\}$. The model is never asked for a number for
+the market.
+
+\paragraph{Call discipline.} Temperature $0$, a pinned seed, $n=1$, thinking disabled through \code{chat\_template\_kwargs} (thinking tokens
+would consume the $4{,}000$-token cap), \code{max\_tokens}$\,=1800$, and no tools. Our own cap is $3$ calls per card against the allowance of $25$,
+with at most one retry after a parse failure. An HTTP $400$/$422$ triggers one resend with the bare OpenAI body, for a deployment that rejects the
+optional fields. Any other failure, and any budget or deadline exhaustion, yields \emph{no} signal.
+
+\subsection{Schema coercion as a one-sided operation}
+
+\begin{definition}
+A coercion $\mathcal K$ from raw model output to $Z$ is \emph{one-sided} if every malformed field maps to its neutral value: $p^\uparrow=\tfrac12$,
+$m=$ none, $v=$ same, tail $=$ none, confidence $0$, established $=$ false.
+\end{definition}
+The implemented coercion is one-sided. Numbers are accepted as probabilities in $[0,1]$ or percentages in $(1,100]$, and anything else maps to
+the default. Only a JSON boolean \code{true} (or the literal string \code{"true"}) counts as established. Two violations of one-sidedness were found
+and fixed by adversarial tests: the string \code{"yes"} had been read as established, which is the one flag that permits narrowing, and a
+confidence of $250$ had been clipped to the \emph{maximum} $1$ instead of being treated as unusable. JSON is extracted with a
+string-and-escape-aware brace matcher after stripping \code{<think>} blocks and code fences, tolerating trailing commas.
+
+\subsection{Lexicon fallback}
+
+Without a usable model answer, a deliberately weak signal is derived from the retrieved passages: widening only when the mean stress exceeds
+$0.35$ ("higher") or $0.6$ ("much higher"), a direction only for rates and only from Federal Reserve tone ($p^\uparrow=0.5+0.08\,\overline{\text{tone}}$),
+and confidence at most $0.4$. The gate additionally caps a lexicon-sourced signal (Section~\ref{sec:fusion}).

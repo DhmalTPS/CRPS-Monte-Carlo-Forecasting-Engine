@@ -1,0 +1,25 @@
+\section{Limitations and open questions}\label{sec:limitations}
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{The value of the language model is essentially unmeasured.} The House endpoint exists only inside the scoring environment. The
+only estimate is the paired difference between the official run and a local text-off run: $-0.0095$ with interval $[-0.026,0.009]$. The gate
+weights are therefore priors, chosen conservatively and protected by Propositions~\ref{prop:gate} and~\ref{prop:tilt}, not fitted.
+\item \textbf{Event selection.} Uniform-date walk-forward undersamples the cards that the competition actually authors. The F2/F4 corrections come
+from only $23$ and $29$ practice cards and are in-sample; the F4 widening is robust across actions, the F2 correction less so.
+\item \textbf{The sharpening trade-off in stress.} The decision layer is weakest where M0 is badly wrong (worst decile $1.053$; 2022 hikes $1.062$).
+A state-dependent action (less sharpening when the text flags stress) is the natural next step, but it can only be learned once text features
+exist historically.
+\item \textbf{A composite of three tilts.} Theorem~\ref{thm:bayes} gives the optimum for each component separately; the one-parameter tempered
+operator is a compromise. A two- or three-parameter family (separate weights for the centre and the tails) might do better, at the cost of more
+selection noise.
+\item \textbf{Pinball non-convexity.} The mixing cap (Theorem~\ref{thm:mix}) is proved for CRPS and VS only.
+\item \textbf{Transfer cards.} The EM premium ($1.25$) and the blend weight ($0.5$) are judgement calls; there is almost no emerging-market data to fit them.
+\item \textbf{Cell ordering.} On three practice cards M0 enumerates cells in card order rather than sorted order; there the replica's draws differ
+from M0's, though its law does not. The fail-safe then scores near, not exactly, $1$.
+\end{enumerate}
+
+\subsection{What would change the design}
+
+A labelled corpus of dated text with outcomes \emph{before} each cutoff would allow fitting the gate (a logistic model for $\Pr(\Delta_{\text{text}}>0)$)
+and adding a text action to the policy. Evidence that sealed cards are not event-selected would argue for the uniform-date actions. Evidence that
+the pinball term dominates in the Final would argue for a separate tail tilt.

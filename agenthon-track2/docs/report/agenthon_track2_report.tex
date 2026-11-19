@@ -1,0 +1,102 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{microtype}
+\usepackage{xurl}
+\emergencystretch=3em
+
+\numberwithin{equation}{section}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\PP}{\mathbb{P}}
+\newcommand{\ind}{\mathbf{1}}
+\newcommand{\CRPS}{\operatorname{CRPS}}
+\newcommand{\VS}{\operatorname{VS}}
+\newcommand{\PB}{\operatorname{PB}}
+\newcommand{\Snorm}{S^{\mathrm{norm}}}
+\newcommand{\MO}{\mathrm{M0}}
+\newcommand{\sd}{\operatorname{sd}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\sgn}{\operatorname{sgn}}
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\argmax}{\operatorname*{arg\,max}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{\textbf{A Ratio-Aware, Gated Probabilistic Forecasting Engine\\for Reasoning-Augmented Time-Series Forecasting}\\[4pt]
+\large Agenthon 2026, Track 2 --- Technical Report and Mathematical Specification\\
+\normalsize Implementation \code{agenthon-track2} v1.0.1}
+\author{Team 89}
+\date{29 September 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+We describe, specify and validate a complete forecasting system for Agenthon~2026 Track~2, in which an agent reads point-in-time
+numerical panels and a dated text corpus and must emit $N$ joint Monte-Carlo draws over a grid of (asset, horizon) cells.
+Submissions are ranked by the equal-weight mean over cards of a composite of marginal CRPS, a variogram score and a pinball tail
+penalty, each normalised \emph{per card} by the same component of an official text-blind Gaussian random-walk baseline (M0),
+clipped at $4$. We show that this normalisation turns forecasting into a decision problem under a \emph{ratio loss}, and derive
+three consequences that dominate the design: (i) a fully reproducible replica of M0 is simultaneously the optimal fail-safe
+(it scores exactly $1$) and the reference against which hypothetical outcomes can be scored; (ii) for any proper score, the
+metric-optimal submission is the honest predictive belief reweighted by the inverse of the baseline's score, which we implement as
+a tempered importance-resampling operator with an honesty floor; (iii) because CRPS and the variogram score are convex in the
+forecast distribution, a mixture with the baseline's own law caps the loss on cards where the baseline happens to be right.
+Around this decision layer we build a strong but humble numerical prior (a mean-reverting variance term structure with a shrunk
+variance ratio, path-coherent joint sampling and a soft lower bound), a lexical, per-unit text pipeline feeding one
+schema-constrained call to the organizer-hosted language model, and an information gate that provably returns the numerical prior
+when the text carries no information. A contextual policy with pessimistic safe-policy-improvement chooses the decision action per
+card. Every fitted quantity is \emph{vintaged} by the last date of data it saw, so that the whole 2003--2024 walk-forward evaluation
+is out of sample. On 3{,}896 walk-forward cards the shipped system scores $0.968$ (95\% block-bootstrap interval $[0.952,0.985]$);
+the first official Development submission scored $0.9782$ on $71/71$ cards. We report every ablation, including the components that
+were rejected, and state plainly what could not be measured.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\input{sections/01_problem}
+\input{sections/02_scoring}
+\input{sections/03_baseline}
+\input{sections/04_ratio_decision}
+\input{sections/05_numerical}
+\input{sections/06_sampling}
+\input{sections/07_text}
+\input{sections/08_fusion}
+\input{sections/09_tails_calibration}
+\input{sections/10_policy}
+\input{sections/11_validation}
+\input{sections/12_results}
+\input{sections/13_engineering}
+\input{sections/14_limitations}
+\appendix
+\input{sections/A_proofs}
+\input{sections/B_parameters}
+\input{sections/C_reproduction}
+\input{sections/D_theory}
+
+\end{document}

@@ -1,0 +1,136 @@
+\section{Further theory}\label{app:theory}
+
+\subsection{Closed-form expected CRPS for Gaussian beliefs}
+
+\begin{lemma}\label{lem:absnormal}
+If $U\sim\mathcal N(m,v)$ then $\E|U|=\sqrt v\,\bigl[2\varphi(m/\sqrt v)+(m/\sqrt v)\bigl(2\Phi(m/\sqrt v)-1\bigr)\bigr]$.
+\end{lemma}
+\begin{proof}
+Write $U=m+\sqrt vZ$ and split at $Z=-m/\sqrt v$. We have $\E(m+\sqrt vZ)^+=m\Phi(m/\sqrt v)+\sqrt v\varphi(m/\sqrt v)$ and
+$\E(m+\sqrt vZ)^-=-m\Phi(-m/\sqrt v)+\sqrt v\varphi(m/\sqrt v)$; adding them gives the result.
+\end{proof}
+
+\begin{proposition}[Expected CRPS of a Gaussian forecast under a Gaussian truth]\label{prop:ecrps}
+Let the truth be $Y\sim\mathcal N(0,1)$ and the forecast $F=\mathcal N(m,\sigma^2)$. Then
+\begin{equation}
+  \E_Y\CRPS(F,Y)=\sqrt{1+\sigma^2}\;\Bigl[2\varphi(\tilde m)+\tilde m\bigl(2\Phi(\tilde m)-1\bigr)\Bigr]-\frac{\sigma}{\sqrt\pi},
+  \qquad \tilde m=\frac{m}{\sqrt{1+\sigma^2}} .
+\end{equation}
+It is minimised at $(m,\sigma)=(0,1)$, where $\E\CRPS=1/\sqrt\pi\approx0.5642$.
+\end{proposition}
+\begin{proof}
+$\E|X-Y|$ with $X\perp Y$ is $\E|U|$ for $U=X-Y\sim\mathcal N(m,1+\sigma^2)$, given by Lemma~\ref{lem:absnormal}. $\E|X-X'|$ for independent copies is
+$\E|\mathcal N(0,2\sigma^2)|=2\sigma/\sqrt\pi$, and half of it is subtracted. At $m=0$, $\sigma=1$: $\sqrt2\cdot2\varphi(0)-1/\sqrt\pi=2/\sqrt\pi-1/\sqrt\pi=1/\sqrt\pi$.
+Propriety (Proposition~\ref{prop:crps-proper}) gives the minimality.
+\end{proof}
+Around the optimum the loss is quadratic in the centre error. With $\sigma=1$ let $f(m)=\E\CRPS$ and $g(u)=2\varphi(u)+u(2\Phi(u)-1)$, so
+$f(m)=\sqrt2\,g(m/\sqrt2)-1/\sqrt\pi$. Since $g'(u)=2\Phi(u)-1$ and $g''(u)=2\varphi(u)$, we get $f'(0)=0$ and $f''(0)=\sqrt2\cdot\frac12\cdot2\varphi(0)=1/\sqrt\pi$, hence
+\begin{equation}
+  \E\CRPS\;\approx\;\frac{1}{\sqrt\pi}\Bigl(1+\frac{m^2}{2}\Bigr).
+\end{equation}
+A centre error of $0.65$ horizon standard deviations, the size of M0's drift noise at $126$ steps (Section~\ref{sec:numerical}), costs about $21\%$ of
+expected CRPS; the exact value from Proposition~\ref{prop:ecrps} is $0.6813$ against $0.5642$, that is $+20.8\%$. Removing it therefore helps expected CRPS, as the ladder confirms
+for raw scores. The next result explains why it nonetheless does not help the \emph{ratio}.
+
+\subsection{A second-order expansion of the expected ratio}
+
+\begin{theorem}[Delta method for the per-card ratio]\label{thm:ratioexp}
+Let $S=S(Q,\bm Y)$ and $S^0=S(F^0,\bm Y)$ be positive with means $\mu,\mu_0$, and let $c_0=\sd(S^0)/\mu_0$ be the baseline's coefficient of
+variation across outcomes and $\rho=\mathrm{Corr}(S,S^0)$. To second order,
+\begin{equation}\label{eq:ratioexp}
+  \E\Bigl[\frac{S}{S^0}\Bigr]\;\approx\;\frac{\mu}{\mu_0}\Bigl(1+c_0^2-\rho\,c_0\,c\Bigr),\qquad c=\sd(S)/\mu .
+\end{equation}
+\end{theorem}
+\begin{proof}
+Expand $g(s,s_0)=s/s_0$ around $(\mu,\mu_0)$: $g_{s}=1/\mu_0$, $g_{s_0}=-\mu/\mu_0^2$, $g_{ss}=0$, $g_{s s_0}=-1/\mu_0^2$, $g_{s_0s_0}=2\mu/\mu_0^3$.
+Taking expectations kills the first-order terms, and
+$\E g\approx\frac{\mu}{\mu_0}+\frac12\bigl(2\cdot(-\tfrac1{\mu_0^2})\Cov(S,S^0)+\tfrac{2\mu}{\mu_0^3}\Var S^0\bigr)
+=\frac{\mu}{\mu_0}\bigl(1-\frac{\Cov(S,S^0)}{\mu\mu_0}+\frac{\Var S^0}{\mu_0^2}\bigr)$. Substitute $\Cov=\rho\,\sd(S)\sd(S^0)$.
+\end{proof}
+
+\begin{corollary}[Why hedging toward the baseline pays]
+For a fixed ratio of means $\mu/\mu_0$, the expected ratio decreases in the correlation $\rho$ between our score and the baseline's across
+outcomes. $\rho=1$ when $Q=F^0$, and it falls as the centre or scale of $Q$ moves away from $F^0$. Moving the centre away from M0's therefore has
+two effects: it lowers $\mu$ (good, if the move is right on average) and it lowers $\rho$ (bad). With $c_0$ of order one, typical for CRPS across
+outcomes, the second effect is first-order in size. This is the analytic content of the observation that the honest, driftless belief scores
+$1.048$ although it is better in raw CRPS.
+\end{corollary}
+\begin{remark}
+For a Gaussian baseline and truth, $S^0=\CRPS(F^0,Y)$ has a coefficient of variation of $0.715$ (computed by simulation with $2\times10^6$ outcomes), so $c_0^2\approx0.51$. Values of $c_0^2$ near $0.5$ mean that
+denominators near their minimum ($0.234\sigma$, Proposition~\ref{prop:shape}) contribute disproportionately, and the tilt of
+Theorem~\ref{thm:bayes} is exactly the reweighting that corrects for this.
+\end{remark}
+
+\subsection{The Gaussian variogram in closed form}
+
+\begin{proposition}\label{prop:gvs}
+If $(X_i,X_j)$ is bivariate Gaussian with $\Var(X_i-X_j)=\sigma^2_{ij}$ and $\E(X_i-X_j)=\delta_{ij}$, then for $\delta_{ij}=0$,
+\begin{equation}
+  \E|X_i-X_j|^p=\sigma_{ij}^p\,\frac{2^{p/2}\,\Gamma\bigl(\frac{p+1}{2}\bigr)}{\sqrt\pi},\qquad
+  p=\tfrac12:\ \E|X_i-X_j|^{1/2}=\sigma_{ij}^{1/2}\cdot\frac{2^{1/4}\Gamma(3/4)}{\sqrt\pi}\approx0.8222\,\sigma_{ij}^{1/2}.
+\end{equation}
+\end{proposition}
+\begin{proof}
+$X_i-X_j=\sigma_{ij}Z$, and $\E|Z|^p=\frac{2^{p/2}\Gamma((p+1)/2)}{\sqrt\pi}$ from the half-normal moment integral
+$2\int_0^\infty z^p\varphi(z)dz$ with the substitution $u=z^2/2$. Numerically, $2^{1/4}\cdot1.2254/1.7725=0.8222$.
+\end{proof}
+
+\begin{corollary}[The cost of independent sampling]
+With $\sigma_{ij}^2=\sigma_i^2+\sigma_j^2-2\rho_{ij}\sigma_i\sigma_j$, sampling the cells independently replaces $\sigma_{ij}$ by
+$\sqrt{\sigma_i^2+\sigma_j^2}$. For $\sigma_i=\sigma_j$ and $\rho=0.9$ (neighbouring Treasury tenors) the predicted $\E|X_i-X_j|^{1/2}$ is inflated by
+$(2/0.2)^{1/4}=1.78$. By Proposition~\ref{prop:vs-opt} each such pair then contributes a squared bias of order $(0.78\cdot0.822)^2\sigma_{ij}$ to the
+expected variogram score. For one asset at horizons $s_1<s_2$ under the path structure, $\sigma^2_{ij}=V(s_2)-V(s_1)$, while independent draws give
+$V(s_1)+V(s_2)$: an inflation factor of $\bigl((V_1+V_2)/(V_2-V_1)\bigr)^{1/4}$, which is $2^{1/4}\approx1.19$ for $s=(21,63)$ under a random walk.
+\end{corollary}
+
+\subsection{Monte-Carlo error in the tails}
+
+\begin{proposition}[Asymptotic variance of an empirical quantile]
+For i.i.d.\ draws from a continuous $F$ with density $f$ positive at $q_\alpha$,
+$\sqrt N(\hat q_\alpha-q_\alpha)\Rightarrow\mathcal N\bigl(0,\alpha(1-\alpha)/f(q_\alpha)^2\bigr)$.
+\end{proposition}
+\begin{proof}
+Bahadur representation: $\hat q_\alpha-q_\alpha=-\frac{\hat F(q_\alpha)-\alpha}{f(q_\alpha)}+o_P(N^{-1/2})$, and $N\hat F(q_\alpha)\sim\mathrm{Bin}(N,\alpha)$.
+\end{proof}
+For a Gaussian cell at $\alpha=0.01$, $f(q_\alpha)=\varphi(2.326)=0.0267$, so $\sd(\hat q_{0.01})\approx\sqrt{0.0099/N}/0.0267$ standard deviations:
+$0.264$ at $N=200$, $0.167$ at $N=500$, $0.083$ at $N=2000$ and $0.059$ at $N=4000$. Because the pinball loss is locally linear in the quantile
+error with slope bounded by $\max(\alpha,1-\alpha)$, this Monte-Carlo noise enters the tail component directly. F4 therefore uses
+$N\ge4000$ and all other cards $N\ge2000$, well above the admissibility floor of $200$.
+
+\begin{proposition}[Monte-Carlo variance of the CRPS estimator]
+For fixed $y$ the estimator \eqref{eq:crps} is a U-statistic of degree two with variance $O(1/N)$. Its leading term is
+$\frac{1}{N}\Var_F\bigl(|X-y|-\E_{X'}|X-X'|\bigr)$.
+\end{proposition}
+\begin{proof}
+Hoeffding decomposition: the first-order projection of the kernel $h(x,x')=\frac12(|x-y|+|x'-y|)-\frac12|x-x'|$ is
+$h_1(x)=|x-y|/2+\E|X-y|/2-\E_{X'}|x-X'|/2$, and $\Var=\frac{4}{N}\Var h_1+O(N^{-2})$.
+\end{proof}
+
+\subsection{GARCH correspondence}
+
+\begin{proposition}
+For GARCH(1,1), $\sigma^2_{t+1}=\omega+\alpha x_t^2+\beta\sigma^2_t$ with $\alpha+\beta<1$, the forecast satisfies
+$\E_t\sigma^2_{t+i}=\bar\sigma^2+(\alpha+\beta)^{i-1}(\sigma^2_{t+1}-\bar\sigma^2)$ with $\bar\sigma^2=\omega/(1-\alpha-\beta)$.
+\end{proposition}
+\begin{proof}
+$\E_t x^2_{t+i-1}=\E_t\sigma^2_{t+i-1}$, so $\E_t\sigma^2_{t+i}=\omega+(\alpha+\beta)\E_t\sigma^2_{t+i-1}$, a first-order linear recursion whose fixed
+point is $\bar\sigma^2$.
+\end{proof}
+Proposition~\ref{prop:agg} is therefore the aggregated GARCH forecast with $\phi=\alpha+\beta$, $\sigma^2_{\text{now}}$ playing the role of
+$\sigma^2_{t+1}$ (estimated by EWMA, the IGARCH limit) and $\sigma^2_{\mathrm{LR}}$ that of $\bar\sigma^2$ (estimated by window variances rather
+than by maximum likelihood). Replacing likelihood estimation with this robust plug-in avoids the convergence failures of per-card GARCH fits on
+short or irregular panels, at no cost to the fail-safe.
+
+\subsection{Scenarios and the variogram}
+
+\begin{proposition}
+Let a mixture have components that differ only by a \emph{common} shift $b$ of all cells. Then the variogram statistic
+$\E|X_i-X_j|^p$ equals that of the unshifted component. If the shift differs across cells, the pairwise statistic becomes a mixture of shifted
+moments, which Proposition~\ref{prop:gvs} generalises through the folded-normal moment with non-zero mean $\delta_{ij}$.
+\end{proposition}
+\begin{proof}
+$X_i+b-(X_j+b)=X_i-X_j$. With cell-specific shifts the difference in component $j$ is $\mathcal N(\delta_{ij},\sigma_{ij}^2)$, whose $p$-th absolute
+moment increases in $|\delta_{ij}|$.
+\end{proof}
+This is why text scenarios are applied as coherent joint stories: a "hawkish surprise" scenario moving all tenors in the same direction leaves the
+cross-tenor geometry intact and only moves the marginals, while a steepening story deliberately changes it.

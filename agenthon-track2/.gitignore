@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+build/
+dist/
+artifacts/forecasts/*
+artifacts/logs/*
+artifacts/diagnostics/*
+!artifacts/**/.gitkeep
+offline/experiments/runs/*.parquet
+submission/submission.zip
+submission/team-key*

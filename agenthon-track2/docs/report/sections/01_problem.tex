@@ -1,0 +1,78 @@
+\section{The forecasting problem}\label{sec:problem}
+
+\subsection{Cards, information sets and the object to be produced}
+
+A \emph{card} (unit) is a tuple
+\begin{equation}
+  C = \bigl(\tau,\ \mathcal{A},\ \mathcal{H},\ \text{type},\ \text{family},\ \bm w,\ \mathcal{L}\bigr),
+\end{equation}
+where $\tau$ is the as-of date (the trusted cutoff \code{[provenance] data\_cutoff}), $\mathcal{A}=\{a_1,\dots,a_d\}$ the target
+assets, $\mathcal{H}$ the declared horizon keys, $\text{type}\in\{\text{level},\text{log\_return}\}$, $\text{family}\in\{\text{F1},\dots,\text{F4}\}$,
+$\bm w=(w_m,w_j,w_t)=(0.5,0.3,0.2)$ the component weights and $\mathcal{L}=\{0.01,0.05,0.95,0.99\}$ the tail levels.
+The \emph{grid} is the set of cells $\mathcal{G}=\mathcal{A}\times\mathcal{H}$, of size $D=|\mathcal{A}|\,|\mathcal{H}|$. Throughout, cells
+are enumerated in \emph{M0 order}: sorted by asset identifier, then by horizon ascending. This is the order in which the official
+baseline assigns standard-normal columns to cells, and keeping it everywhere makes our draw matrices align with the baseline's.
+
+The agent receives two information sets, both truncated by the organizers' staging gates:
+\begin{align}
+  \mathcal{X}_{\le\tau} &= \{(t,a,x_{t,a}) : t\le\tau\} &&\text{(numerical panels)},\\
+  \mathcal{T}_{\le\tau} &= \{(t^{\mathrm{avail}}_k, \text{doc}_k) : t^{\mathrm{avail}}_k \le \tau\} &&\text{(dated corpus)}.
+\end{align}
+It must output $N$ joint draws $\bm Y^{(1)},\dots,\bm Y^{(N)}\in\R^D$, $200\le N\le 20000$, where a draw index denotes one coherent
+joint scenario across all cells. Formally the target of estimation is the conditional law
+\begin{equation}\label{eq:target}
+  P_1 \;=\; \mathcal{L}\bigl(\bm Y_{\tau+\mathcal{H}} \,\big|\, \mathcal{X}_{\le\tau},\mathcal{T}_{\le\tau}\bigr),
+  \qquad
+  P_0 \;=\; \mathcal{L}\bigl(\bm Y_{\tau+\mathcal{H}} \,\big|\, \mathcal{X}_{\le\tau}\bigr),
+\end{equation}
+where $P_0$ is the text-blind prior. The \emph{text uplift} on a card is $\Delta_{\mathrm{text}}(C)=S(P_0)-S(P_1)$, positive when the text
+helped.
+
+\subsection{Target semantics}
+
+For a \emph{level} target the value at horizon $h$ is the panel value $h$ steps after $\tau$ (business days for daily panels, calendar
+months for the four monthly macro cards; see Section~\ref{sec:baseline}). For a \emph{log\_return} target the panel rows are decimal
+per-step \emph{simple} returns $r_t$ and the target is the cumulative log return
+\begin{equation}
+  Y_{\tau,h} \;=\; \sum_{i=1}^{h}\log(1+r_{\tau+i}),
+\end{equation}
+anchored at zero: the last observed return belongs to the history, not to the future total.
+
+\subsection{Families}
+
+The four families differ in the role of text and in the score component that discriminates:
+F1 (continuation with context; marginal CRPS), F2 (text-cued regime shift, including transfer to emerging-market currencies whose
+path is withheld; CRPS and tail), F3 (cross-asset reasoning; the variogram term), F4 (tail and shock from text; the pinball term).
+The public practice roster has $104$ directories ($103$ cards plus one exemplar): $60$ single-cell cards, horizons concentrated on
+$\{21,63,126,189\}$, and $88$ level versus $16$ log-return targets. A structural fact that matters later is that practice cards are
+\emph{authored around events}: the as-of date sits just before a notable episode. We treat this as evidence that the sealed evaluation
+cards (H2~2025--Q2~2026) are event-selected in the same way.
+
+\subsection{Constraints that shape the architecture}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Network.} At scoring time the only egress is an audited proxy to one organizer-hosted open model
+  (\path{nvidia/nemotron-3-super-120b-a12b}, snapshot \code{rl-030326-fp8}) at \path{$MODEL_ENDPOINT/v1/chat/completions}, with
+  $25$ admitted requests per card and at most $4{,}000$ output tokens per request. Thinking is on by default and consumes that budget.
+  \item \textbf{Artifacts.} Pretrained neural checkpoints (time-series foundation models, embedding models, rerankers) require separate
+  organizer approval; static dictionaries and BM25-type indexes are permitted. Every fitted quantity must have been computable from data
+  available by each relevant task cutoff.
+  \item \textbf{Runtime.} A read-only root filesystem, a non-root user with no home, a $64$\,MiB non-executable \code{/tmp}, $256$ processes,
+  and a phase-shared clock of $43{,}200$\,s for about one hundred cards.
+  \item \textbf{Output.} Exactly three files in \code{/output}: \code{forecast.parquet} with columns
+  \code{draw:int32}, \code{asset:string}, \code{horizon:int32}, \code{value:float64}, \code{forecast\_meta.json} whose \code{unit\_id} and \code{asof} must equal the
+  card's, and a non-blank \code{forecast\_rationale.md} that is never scored. Four admissibility gates g0--g3 must pass; a failure is scored
+  as the worst value, $4$.
+\end{enumerate}
+
+\subsection{Summary of the approach}
+
+The system is a directed acyclic pipeline, L0 through L23, wrapped in a fail-safe:
+\begin{align*}
+&\underbrace{C}_{\text{L0}}\to\underbrace{(\mathcal{X}_{\le\tau},\mathcal{T}_{\le\tau})}_{\text{L1}}\to
+\underbrace{s_\tau,\pi_\tau}_{\text{L2--L4}}\to\underbrace{P_0}_{\text{L5--L7}}\to
+\underbrace{E\to\bar E\to q\to R\to Z}_{\text{L8--L13}}\\
+&\qquad\to\underbrace{z,\kappa,g}_{\text{L14--L16}}\to
+\underbrace{P_1}_{\text{L17--L19}}\to\underbrace{\{\bm Y^{(k)}\}}_{\text{L21}}\to\underbrace{Q}_{\text{L22b}}\to\text{L23}.
+\end{align*}
+The distinctive element is L22b, the \emph{score-aware decision layer}, which Section~\ref{sec:ratio} derives from the scoring rule.

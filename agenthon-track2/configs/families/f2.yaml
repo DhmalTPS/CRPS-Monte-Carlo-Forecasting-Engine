@@ -1,0 +1,8 @@
+# F2 policy knobs (one backbone; see src/agenthon/families/f2.py)
+families:
+  f2:
+    gate_intercept_shift: 0.4
+    text_strength: 1.0
+    tail_strength: 1.0
+    dependence_strength: 0.5
+    scale_mult: 1.0

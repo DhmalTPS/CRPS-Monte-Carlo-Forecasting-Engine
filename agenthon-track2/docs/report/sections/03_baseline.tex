@@ -1,0 +1,74 @@
+\section{The official baseline M0 and its exact replica}\label{sec:baseline}
+
+\subsection{Specification}
+
+M0 is a text-blind joint Gaussian random walk, published in full except for its code and its per-card scales. For each target asset $a$:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Window.} Take the rows at or before $\tau$ from the first panel file (sorted filename order) containing $a$, and keep the
+last $300$ observations $v_{a,1},\dots,v_{a,n}$ with dates $t_1<\dots<t_n$.
+\item \textbf{Steps.} For a level target $\Delta_{a,i}=v_{a,i}-v_{a,i-1}$; for a log-return target the row itself, $\Delta_{a,i}=v_{a,i}$
+(already a per-step return), with a tripwire refusing panels whose median absolute value is at least $0.2$. A step is dated at the row it ends on.
+\item \textbf{Gap rule.} Drop any step spanning an interval longer than
+\begin{equation}
+  \ell \;=\; \max\bigl(10\cdot\mathrm{median}_i(t_i-t_{i-1}),\ 5\ \text{days}\bigr).
+\end{equation}
+On transfer cards this stops a withheld decade from being read as one step.
+\item \textbf{Alignment.} Intersect the step dates across assets; drop a date for all assets if any asset lacks a step there.
+\item \textbf{Moments.} $\mu_a=\overline{\Delta_a}$, $\Sigma=\widehat{\Cov}(\Delta)$ with the sample convention, over the intersected rows.
+\item \textbf{Anchor.} $v_{a,n}$ for a level target (the last observation, not the as-of), $0$ for a log-return target.
+\item \textbf{Horizon to steps.} For cell $(a,h)$ with a known target date $T$: estimate the spacing $\bar\delta$ as the mean non-hole interval;
+count $s=12(y_T-y_n)+(m_T-m_n)$ calendar months if $\bar\delta>20$ days, else $s=\mathrm{round}((T-t_n)/\bar\delta)$; if $s\le 0$ or the target
+date is unknown use $s=h$; otherwise keep $h$ unless $\max(s,h)/\max(\min(s,h),1)\ge 2$.
+\item \textbf{Mean and covariance over cells.} With cells $c=(a_c,h_c)$ and step counts $s_c$,
+\begin{equation}\label{eq:m0cov}
+  m_c = \text{anchor}_{a_c} + s_c\,\mu_{a_c}, \qquad K_{cc'} = \min(s_c,s_{c'})\,\Sigma_{a_c a_{c'}} .
+\end{equation}
+\item \textbf{Draws.} $K\leftarrow K+10^{-10}I$; $L=\mathrm{chol}(K+10^{-9}I)$, falling back to $\diag(K+10^{-9}I)^{1/2}$;
+seed $=\mathrm{crc32}(\text{unit\_id})\wedge(2^{31}-1)$; $Z\sim\mathcal N(0,I)^{500\times D}$ from \code{numpy.default\_rng(seed)}; draws
+$m+ZL^\top$.
+\end{enumerate}
+
+\begin{proposition}[Path structure]\label{prop:m0path}
+Under \eqref{eq:m0cov}, for one asset observed at $s_1<s_2$ steps, the increment between the two cells is independent of the first cell and
+has variance $(s_2-s_1)\Sigma_{aa}$; the correlation of the two cells is $\sqrt{s_1/s_2}$.
+\end{proposition}
+\begin{proof}
+$\Cov(X_1,X_2-X_1)=\min(s_1,s_2)\Sigma-\min(s_1,s_1)\Sigma=0$ and
+$\Var(X_2-X_1)=s_2\Sigma-2s_1\Sigma+s_1\Sigma=(s_2-s_1)\Sigma$; jointly Gaussian and uncorrelated implies independent.
+Finally $\mathrm{Corr}=s_1\Sigma/\sqrt{s_1s_2}\Sigma=\sqrt{s_1/s_2}$.
+\end{proof}
+
+\subsection{Verification of the replica}
+
+The replica (\code{numerical.random\_walk.m0\_forecast}) reproduces every figure of the published worked example: the exemplar's seed is
+$795{,}546{,}941$; its trailing window has $129$ rows per asset, hence $128$ steps; the counted step number is $24$ against a declared
+$21$, ratio $1.14<2$, so $21$ is kept. On the monthly macro cards the month-counting branch fires and gives $8$ and $9$ steps for
+declared horizons $140$ and $160$, and $2$ steps for the NFP and CPI-vintage cards. A development bug is worth recording because it would
+have been silent: under \code{pandas}~3 datetime indices are not guaranteed nanosecond resolution, so interval computations of the form
+$\text{asi8}/86{,}400\times10^9$ returned counts in the tens of thousands; all day arithmetic now goes through a resolution-independent
+helper.
+
+\begin{proposition}[The replica scores exactly one]\label{prop:m0one}
+If the submitted draws are bit-identical to M0's, then $\Snorm=\sum_k\tilde w_k=1$ for every outcome $\bm y$.
+\end{proposition}
+\begin{proof}
+Each ratio in \eqref{eq:snorm} is $S_k/S_k=1$ when $S_k^0>0$, and $S_k/1=S_k$ with $S_k=S^0_k\le0$ when $S^0_k\le0$. The latter happens only for the
+variogram on a single-cell card, where it is $0$ and its weight is $0$. Hence the sum is $\sum_k\tilde w_k=1<4$.
+\end{proof}
+In the walk-forward (Section~\ref{sec:validation}) submitting the replica scores $1.0000$ on all $3{,}896$ cards, an end-to-end check of the
+normalisation chain.
+
+\subsection{Why M0 is both the fail-safe and the reference}
+
+A card that fails costs $4$; the reference implementation shipped by the organizers averages about $1.29$. Submitting M0's own draws costs
+exactly $1$ by Proposition~\ref{prop:m0one}, so the replica is the best possible fail-safe that needs no model. The same object is the
+denominator of the loss: since the draws are reproducible from the card alone, the agent can compute $\bm S^0(\bm y)$ for any hypothetical
+$\bm y$. Section~\ref{sec:ratio} exploits this.
+
+\subsection{Known weaknesses of M0}
+
+Relative to a careful forecaster M0 (i) uses a raw $300$-observation mean drift, mostly estimation noise for near-martingale series;
+(ii) uses one sample variance with no conditional dynamics; (iii) is Gaussian; (iv) has no lower bound for yields; (v) on transfer cards
+estimates its scale from a decades-old window. Section~\ref{sec:results} shows that correcting (i)--(iii) in the \emph{honest} forecast does not by
+itself beat M0 under \eqref{eq:snorm}. The reason is the subject of the next section.

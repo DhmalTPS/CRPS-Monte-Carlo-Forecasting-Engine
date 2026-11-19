@@ -1,0 +1,101 @@
+\section{Joint dependence and path-coherent sampling}\label{sec:sampling}
+
+\subsection{Increment correlation}
+
+Let $\Delta$ be the matrix of date-aligned steps for the card's assets. We combine a short and a longer estimator:
+\begin{equation}
+  C_0 = \tfrac12\,\widehat{\mathrm{Corr}}\bigl(\Delta_{-299:}\bigr) + \tfrac12\,\widehat{\mathrm{Corr}}\bigl(\textstyle\sum_{5}\Delta_{-1260:}\bigr),\qquad
+  C = (1-\eta)C_0+\eta\,\widehat{\mathrm{Corr}}(\Delta_{-299:}),\ \eta=0.15,
+\end{equation}
+where $\sum_5$ denotes overlapping $5$-step sums. These are robust to asynchronous closes (FX fixings versus Treasury closes), which bias daily
+correlations toward zero.
+
+\begin{lemma}[Nearest correlation by eigenvalue clipping]\label{lem:nearcorr}
+For symmetric $A$ with eigen-decomposition $A=V\Lambda V^\top$, the matrix $\tilde A=D^{-1/2}V\max(\Lambda,\epsilon I)V^\top D^{-1/2}$, with
+$D=\diag(V\max(\Lambda,\epsilon I)V^\top)$, is a positive-definite correlation matrix.
+\end{lemma}
+\begin{proof}
+$V\max(\Lambda,\epsilon I)V^\top$ has eigenvalues at least $\epsilon>0$, so it is positive definite. A congruence by the positive diagonal $D^{-1/2}$
+preserves positive definiteness and sets the diagonal to one.
+\end{proof}
+Every correlation matrix produced anywhere in the pipeline passes through this map as a final guard.
+
+\subsection{The generator}
+
+\begin{definition}[Joint belief]
+A \code{JointBelief} consists of centres $\mu\in\R^D$; sorted unique step points $p_1<\dots<p_K$; per-asset cumulative variances
+$V_a(p_1)\le\dots\le V_a(p_K)$; an increment correlation $C\in\R^{A\times A}$; a scale-mixture dof $\nu$; and scenarios
+$\{(\pi_j,\bm b_j,\bm c_j)\}_{j=1}^J$ (weight, per-cell shift, per-cell scale), $\sum_j\pi_j=1$, $\bm c_j>0$.
+\end{definition}
+
+For draw $m$:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Scenario.} Choose $j_m$ by stratified allocation (exact counts $\lfloor\pi_jN\rfloor$, remainder by largest fractional part at random).
+\item \textbf{Mixing.} $W_m=(\nu-2)/\chi^2_\nu$, independent of everything else; $W_m\equiv1$ if $\nu>200$.
+\item \textbf{Increments.} $\bm\xi_{m,k}\sim\mathcal N(0,C)$ i.i.d.\ over $k$, and the path
+$X_{m,a}(p_k)=\sum_{l\le k}\sqrt{V_a(p_l)-V_a(p_{l-1})}\;\xi_{m,l,a}$ with $V_a(p_0)=0$.
+\item \textbf{Value.} For cell $c=(a,h)$ with step count $s_c=p_{k(c)}$:
+$Y_{m,c}=\mu_c+b_{j_m,c}+c_{j_m,c}\sqrt{W_m}\,X_{m,a}(s_c)$, then the soft floor where one applies.
+\end{enumerate}
+Draws are generated in antithetic pairs $(\bm\xi,-\bm\xi)$ sharing $W$ and the scenario label.
+
+\begin{proposition}[Covariance of the base layer]\label{prop:pathcov}
+For the base scenario ($\bm b=0,\bm c=1$) and $\nu>2$, for cells $c=(a,s)$ and $c'=(a',s')$,
+\begin{equation}
+  \Cov(Y_c,Y_{c'}) \;=\; C_{aa'}\sum_{l:\,p_l\le\min(s,s')}\sqrt{\Delta V_a(p_l)\,\Delta V_{a'}(p_l)},\qquad \Delta V(p_l)=V(p_l)-V(p_{l-1}).
+\end{equation}
+In particular $\Var(Y_c)=V_a(s)$, and for one asset $\Cov(Y_{(a,s)},Y_{(a,s')})=V_a(\min(s,s'))$: the path structure of
+Proposition~\ref{prop:m0path}, with the random-walk variance replaced by the term structure.
+\end{proposition}
+\begin{proof}
+$\E W=1$ (Lemma~\ref{lem:tmix}), and $W$ is independent of $\bm\xi$, so $\Cov(\sqrt W X_{a}(s),\sqrt W X_{a'}(s'))=\E[W]\,\Cov(X_a(s),X_{a'}(s'))$.
+Increments at different $l$ are independent with zero mean, so only common indices $l\le\min$ contribute, each
+$\sqrt{\Delta V_a\Delta V_{a'}}\,\E[\xi_{l,a}\xi_{l,a'}]=\sqrt{\Delta V_a\Delta V_{a'}}\,C_{aa'}$.
+\end{proof}
+
+\begin{corollary}[Validity]
+The generator always produces a valid joint law: its covariance is a sum over $l$ of $D_l C_{\mathcal A} D_l$ terms with diagonal $D_l\succeq0$,
+each positive semidefinite. No matrix is ever edited element-wise.
+\end{corollary}
+
+\begin{lemma}[Variance-preserving $t$ mixing]\label{lem:tmix}
+If $\chi^2\sim\chi^2_\nu$ with $\nu>2$ then $\E[(\nu-2)/\chi^2]=1$. Hence $\sqrt W\,\bm Z$ has the covariance of $\bm Z$, is multivariate Student-$t$ with
+$\nu$ degrees of freedom, and has tail dependence across cells.
+\end{lemma}
+\begin{proof}
+$\E[1/\chi^2_\nu]=1/(\nu-2)$ for $\nu>2$, since $\int_0^\infty x^{-1}\frac{x^{\nu/2-1}e^{-x/2}}{2^{\nu/2}\Gamma(\nu/2)}dx=\frac{2^{\nu/2-1}\Gamma(\nu/2-1)}{2^{\nu/2}\Gamma(\nu/2)}=\frac1{\nu-2}$.
+\end{proof}
+Mixing preserves the variance forecast exactly: the choice of tail shape does not bias the width. The walk-forward selected $\nu\approx\infty$
+(Gaussian) for the fitted vintages. Fat tails were rejected by the ratio metric (Section~\ref{sec:results}).
+
+\subsection{The soft lower bound for yields}
+
+Gaussian walks from $0.1\%$ put real mass on yields that do not print. For UST cells we apply
+\begin{equation}
+  f(y)=\begin{cases} y & y\ge b\\ b-k\log\bigl(1+(b-y)/k\bigr) & y<b\end{cases},\qquad b=f_0+k,\ f_0=-0.10,\ k=0.25,
+\end{equation}
+with a hard stop at $f_0-5k$.
+
+\begin{proposition}
+$f$ is continuous, continuously differentiable, strictly increasing, the identity on $[b,\infty)$, and $f'(b^-)=1$.
+\end{proposition}
+\begin{proof}
+For $y<b$, $f'(y)=k\cdot\frac{1/k}{1+(b-y)/k}=\frac{1}{1+(b-y)/k}\in(0,1)$, which tends to $1$ as $y\uparrow b$, and $f(b^-)=b$.
+\end{proof}
+Because $f$ is monotone it maps quantiles to quantiles and leaves the copula untouched. The upper tail, which matters for hiking episodes, is unaffected.
+
+\subsection{Text-driven dependence (L19)}
+
+When the text supports a stress regime on a multi-asset card, the increment correlation moves convexly toward a one-factor stress structure
+$C^{\text{stress}}_{ij}=s_is_j\,r$ for $i\ne j$, where $s_i$ is the sign of asset $i$'s loading on the first principal component and
+$r=\min\{0.95,\ \overline{|C_{ij}|}+\tfrac12(1-\overline{|C_{ij}|})\}$:
+\begin{equation}
+  C_1 = (1-w)\,C + w\,C^{\text{stress}},\qquad w=\min\bigl(0.5,\ 0.5\,g\cdot\text{dependence strength}\bigr).
+\end{equation}
+\begin{proposition}\label{prop:psd}
+If $C,C^{\text{stress}}\succeq0$ then $C_1\succeq0$ for every $w\in[0,1]$, and $C_1=C$ at $g=0$.
+\end{proposition}
+\begin{proof}
+For $v\in\R^A$, $v^\top C_1v=(1-w)v^\top Cv+w\,v^\top C^{\text{stress}}v\ge0$; the positive-semidefinite matrices form a convex cone. The matrix
+$C^{\text{stress}}=r\,\bm s\bm s^\top+(1-r)I$ is positive semidefinite for $r\in[0,1]$.
+\end{proof}

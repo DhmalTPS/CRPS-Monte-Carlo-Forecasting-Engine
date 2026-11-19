@@ -1,0 +1,63 @@
+\section{Tails, shrinkage and calibration}\label{sec:tails}
+
+\subsection{The in-unit residual bank}
+
+For past cutoffs $t$ of the unit's own history (stride $10$ over the last $12$ years, and only $t+s\le$ last observation $\le\tau$), the same
+variance formula gives $V(s\mid t)$ from $\sigma^2_{E,t}$, $\hat\sigma^2_{300,t}$ and $\hat\sigma^2_{L,t}$ as vectorised rolling series, and the
+standardised error is
+\begin{equation}
+  z_t(s)=\frac{\sum_{i=1}^s x_{t+i}}{\sqrt{c^2\,VR^\star(s)\,V(s\mid t)}} .
+\end{equation}
+Every quantity is computable at $\tau$: this is a walk-forward \emph{inside} the container, needing no cross-unit or post-cutoff data.
+
+\subsection{Empirical-Bayes shrinkage with effective sample size}
+
+Overlapping windows at stride $k$ carry fewer than $n$ independent observations.
+
+\begin{lemma}[Effective size under overlap]
+If $s$-step sums are sampled at stride $k<s$ from a series of independent steps, adjacent sums share a fraction $1-k/s$ of their steps. The
+number of non-overlapping blocks, which bounds the independent information, is about $n\,k/s$.
+\end{lemma}
+\begin{proof}
+Over a span of $nk$ steps, non-overlapping $s$-blocks number $nk/s$. Any sum is a linear combination of these blocks and of partial blocks, and
+the variance estimate cannot use more independent components than there are blocks.
+\end{proof}
+We use $n_{\mathrm{eff}}=n\min(1,k/s)$. The scale bias and its shrinkage toward the global level $1$ are
+\begin{equation}
+  \hat b=\sqrt{\mathrm{RMS}(z)\cdot1.4826\,\mathrm{MAD}(z)},\qquad
+  \log b^\star=\frac{n_{\mathrm{eff}}}{n_{\mathrm{eff}}+n_0}\log\hat b,\quad n_0=60,\qquad b^\star\in[0.75,1.35],
+\end{equation}
+the geometric mean of two scale estimators that are both consistent under normality. For tail thickness, with sample excess kurtosis $\hat k$ of
+$z$, the local Student dof is $\hat\nu=4+6/\hat k$, because a $t_\nu$ has excess kurtosis $6/(\nu-4)$. It is shrunk in $1/\nu$, the natural
+parameter for tail weight:
+\begin{equation}
+  \frac1{\nu^\star}=\frac{n_{\mathrm{eff}}}{n_{\mathrm{eff}}+n_0'}\cdot\frac1{\hat\nu}+\frac{n_0'}{n_{\mathrm{eff}}+n_0'}\cdot\frac1{\nu_{\mathrm{prior}}},\qquad n_0'=120 .
+\end{equation}
+
+\begin{remark}[Why shrinkage has this form]
+If $\log\hat b\sim\mathcal N(\log b,\tau^2/n_{\mathrm{eff}})$ and the prior is $\log b\sim\mathcal N(0,\tau^2/n_0)$, the posterior mean is
+exactly $\frac{n_{\mathrm{eff}}}{n_{\mathrm{eff}}+n_0}\log\hat b$: the James--Stein/empirical-Bayes argument, applied to a scale parameter.
+\end{remark}
+
+\paragraph{Status.} The bank is implemented and tested but \emph{disabled}. In walk-forward tuning it did not deliver a robust out-of-sample gain
+(train $0.948$ against $0.945$ for the base; test $0.964$ against $0.967$), which is within noise. The pre-registered rule is that a component
+ships only on a robust gain.
+
+\subsection{Probabilistic calibration}
+
+If realised PITs $u=F(y)$ have cdf $G$, then $F'=G\circ F$ is calibrated. For draws, a draw at forecast level $u$ is moved to the forecast's
+own quantile at level $G^{-1}(u)$, per cell, using the draws' ranks with one common $u$ per draw.
+
+\begin{proposition}[Calibration leaves the copula unchanged]
+Applying a strictly increasing map $T_c$ to each cell separately leaves the copula of the joint draws unchanged.
+\end{proposition}
+\begin{proof}
+The copula is the joint law of the ranks, and strictly increasing maps preserve ranks (Sklar's theorem).
+\end{proof}
+$G^{-1}$ is estimated on $17$ knots by pool-adjacent-violators isotonic regression of the empirical PIT quantiles, then shrunk toward the identity
+with weight $n/(n+200)$, per asset class $\times$ horizon bucket.
+
+\paragraph{Status: rejected.} Maps fitted on outcomes before 2015 \emph{worsened} the 2015--2024 walk-forward from $0.964$ to $0.977$, helping on
+only $48\%$ of cards. The reason is instructive. The PIT histograms show mild miscalibration of the \emph{honest} belief, but the submission is
+not the honest belief. The score-aware operator already reshapes it for the ratio loss, and recalibrating the input to that operator does not carry
+through. Calibration is disabled, and the maps are kept in \code{calibration\_vintages.json} for transparency.

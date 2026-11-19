@@ -1,0 +1,8 @@
+# F3 policy knobs (one backbone; see src/agenthon/families/f3.py)
+families:
+  f3:
+    gate_intercept_shift: 0.0
+    text_strength: 0.8
+    tail_strength: 0.6
+    dependence_strength: 1.0
+    scale_mult: 1.0

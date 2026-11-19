@@ -1,0 +1,94 @@
+\section{The adaptive policy: reinforcement learning under noisy rewards}\label{sec:policy}
+
+\subsection{What the policy is allowed to decide}
+
+The statistical backbone is fixed. The policy only decides how far the submission moves from the honest belief toward the metric-optimal act,
+through the discrete action set
+\begin{equation}
+  \mathcal A=\{(\gamma,\lambda):\gamma\in\{0,0.5,0.8,1,1.25,1.5,1.75,2\},\ \lambda\in\{0,0.1,0.2,0.3,0.4\}\},\qquad |\mathcal A|=40,
+\end{equation}
+applied through \eqref{eq:action}. Text strength is \emph{not} an action. The historical walk-forward has no corpus, so there is no data from which
+to learn it, and a text action would be learned from nothing. It stays with the family policy and the gate.
+
+\subsection{Why this is full-information contextual learning, not PPO}
+
+A card is a one-step episode: the action does not change future states, only the loss on this card. That is a contextual decision problem. In
+the offline walk-forward the outcome $\bm y$ is observed after the episode, and the loss of \emph{every} action on the same belief pool is
+computable. The feedback is therefore full-information, not bandit: there is no exploration problem. The problem reduces to cost-sensitive
+contextual learning:
+\begin{equation}
+  \pi^\star(x)=\argmin_{a\in\mathcal A}\ \E\bigl[\Snorm(Q_a,\bm Y)\,\big|\,x\bigr].
+\end{equation}
+
+\subsection{Variance-controlled reward}
+
+Financial outcomes are dominated by noise: a four-sigma surprise scores badly under every action. Regressing the raw loss on the context would
+mostly learn card difficulty. We instead use the \emph{advantage} over a default action $a_0$ on the same card and the same outcome,
+\begin{equation}
+  r_a = \Snorm(Q_{a_0},\bm y)-\Snorm(Q_a,\bm y),
+\end{equation}
+which cancels the common card-level component. Formally, if $\Snorm(Q_a,\bm y)=\beta(\bm y)+\delta_a(x,\bm y)$ with a large common term $\beta$,
+then $\Var(r_a)=\Var(\delta_{a_0}-\delta_a)\ll\Var(\beta)$. This is the counterfactual incremental reward of the design notes, realised exactly
+because every action is scored.
+
+\subsection{Context}
+
+Sixteen features, all available at inference time:
+\begin{equation}
+  x=\bigl(1,\ \overline{\log\rho},\ \overline{\min(|m|,4)},\ \log(\bar s/21),\ \ind_{\text{single}},\ \ind_{\text{log\_return}},\
+  \{\text{class shares}\}_{5},\ \{\ind_{\text{family}}\}_{4},\ g_{\text{text}}\bigr),
+\end{equation}
+where $g_{\text{text}}$ is $0$ at decision time (the policy is chosen before the text runs).
+
+\subsection{Per-action Bayesian ridge and pessimistic selection}
+
+For each non-default action $a$ we fit $r_a\approx x^\top\theta_a$ with a Gaussian prior $\theta_a\sim\mathcal N(0,\sigma^2\Lambda^{-1})$,
+$\Lambda=\lambda_rI$:
+\begin{equation}
+  A_a=\lambda_rI+X^\top X,\qquad \hat\theta_a=A_a^{-1}X^\top r_a,\qquad \Var(x^\top\theta_a\mid\mathcal D)=\hat\sigma^2_a\,x^\top A_a^{-1}x,
+\end{equation}
+with $\hat\sigma^2_a$ the residual variance and $\lambda_r=100$. Selection is \emph{pessimistic}:
+\begin{equation}\label{eq:lcb}
+  \hat a(x)=\begin{cases}\argmax_a\mathrm{LCB}_a(x) & \max_a\mathrm{LCB}_a(x)>0\\ a_0 & \text{otherwise,}\end{cases}\qquad
+  \mathrm{LCB}_a(x)=x^\top\hat\theta_a-k\,\hat\sigma_a\sqrt{x^\top A_a^{-1}x}.
+\end{equation}
+
+\begin{proposition}[Safe improvement]\label{prop:safe}
+If the posterior is correctly specified, then conditional on $x$ and for each $a$, $\PP\bigl(\E[r_a\mid x]<0\ \text{and}\ \hat a(x)=a\bigr)\le\Phi(-k)$.
+Deviations from the default therefore rarely make the expected loss worse; with $k=2$, the per-action rate is at most $2.3\%$.
+\end{proposition}
+\begin{proof}
+$\hat a(x)=a$ requires $\mathrm{LCB}_a(x)>0$, that is $x^\top\hat\theta_a>k\,\mathrm{sd}$. Under the posterior, $\E[r_a\mid x]=x^\top\theta_a$ is
+Gaussian with mean $x^\top\hat\theta_a$ and that standard deviation, so the posterior probability that it is negative is at most $\Phi(-k)$.
+\end{proof}
+This is the spirit of safe policy improvement with baseline bootstrapping: deviate from a trusted default only where the data support it with
+margin. \code{LinearArm} also provides Thompson sampling and LinUCB-style online updates, but they are not used in production, because offline
+feedback is full-information.
+
+\subsection{Evidence that pessimism is necessary}
+
+Trained on cards whose outcome is known before 2015 and evaluated on cards from 2015 onwards:
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+ridge $\lambda_r$ & pessimism $k$ & test, default & test, policy & share deviating\\
+\midrule
+20 & 0 & 0.9665 & 0.9689 & 96\%\\
+20 & 2 & 0.9665 & \textbf{0.9636} & 36\%\\
+100 & 0 & 0.9665 & 0.9704 & 94\%\\
+100 & 1 & 0.9665 & 0.9664 & 70\%\\
+100 & 2 & 0.9665 & \textbf{0.9631} & 31\%\\
+400 & 2 & 0.9665 & 0.9649 & 17\%\\
+\bottomrule
+\end{tabular}
+\end{center}
+With no pessimism the policy improves in-sample (train about $0.936$ against $0.945$) and \emph{worsens} out of sample. That is overfitting to noise, as
+one should expect with low signal-to-noise. Only the pessimistic variants beat the default out of sample, and modestly: $0.9665\to0.963$. The
+shipped policy uses $\lambda_r=100$, $k=2$, fitted per vintage (Section~\ref{sec:validation}). For F2 and F4 in the latest vintage the policy is
+switched off, because those families use a different default action. A policy trained against the generic default would steer toward the wrong
+reference.
+
+\subsection{Family policy}
+
+A family changes only a handful of scalars (gate intercept shift, text strength, tail strength, dependence strength, a width multiplier, draw
+count), never the backbone. F4 uses at least $4{,}000$ draws, because the $1\%$ quantile from $200$ draws rests on two order statistics.

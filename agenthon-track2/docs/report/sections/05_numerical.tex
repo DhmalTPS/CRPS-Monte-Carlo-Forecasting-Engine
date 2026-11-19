@@ -1,0 +1,113 @@
+\section{The numerical prior $P_0$}\label{sec:numerical}
+
+\subsection{Point-in-time state (L1--L3)}
+
+\paragraph{Availability operator.} For a labelled stream $D$, $\Phi(D;\tau)=\{x\in D: t^{\mathrm{avail}}(x)\le\tau\}$. The organizers already
+truncate panels and corpora at staging; our loader re-applies $\Phi$ as defence in depth, with the \emph{information cutoff}
+$\tau^\star=\min(\tau_{\text{card}},\tau_{\text{cli}})$. Undated documents are excluded because their availability cannot be established.
+Non-finite rows are dropped at load.
+
+\paragraph{Steps.} For asset $a$ with gap-cleaned history, $x_{a,t}=v_{a,t}-v_{a,t-1}$ (level) or $x_{a,t}=\log(1+r_{a,t})$ (log return), using
+the gap rule of Section~\ref{sec:baseline} on the full history.
+
+\paragraph{State features.} The following are computed at $\tau^\star$:
+\begin{align}
+  \hat\sigma^2_{E,t} &= \lambda\hat\sigma^2_{E,t-1}+(1-\lambda)x_t^2,\quad \lambda=2^{-1/H},\ H=30 &&\text{(EWMA, uncentred)}\\
+  \hat\sigma^2_{300} &= \widehat{\Var}(x_{t-298:t}) &&\text{(M0's window)}\\
+  \hat\sigma^2_{L} &= \widehat{\Var}(x_{t-L+1:t}),\quad L=1260 &&\text{(long run)}\\
+  \rho_t &= \hat\sigma_{E,t}/\hat\sigma_{L} &&\text{(vol ratio)}\\
+  m_t &= \textstyle\sum_{i<63}x_{t-i}\big/(\hat\sigma_L\sqrt{63}) &&\text{(trend $z$-score)}.
+\end{align}
+The EWMA is initialised by blending in the mean of the first $20$ squared steps with a linearly decaying weight, so the first values are not a
+single squared step. The uncentred form is deliberate: the drift of a daily step is negligible relative to its scale, and centring would inject
+estimation noise.
+
+\paragraph{Regime (L4).} A deliberately small, soft three-state model on one well-measured quantity, the mean log vol ratio
+$\ell=\overline{\log\rho}$ across the card's assets:
+\begin{equation}
+  \pi_{\text{stress}}=\sigma\bigl(k(\ell-\log 1.35)\bigr),\quad \pi_{\text{calm}}=\sigma\bigl(-k(\ell-\log 0.8)\bigr),\quad
+  \pi_{\text{normal}}=\bigl(1-\pi_{\text{stress}}-\pi_{\text{calm}}\bigr)_+ ,
+\end{equation}
+renormalised, with $k=8$. With about one hundred cards and thin per-regime samples, a high-dimensional latent regime model cannot be estimated
+without shrinkage that would defeat it. Soft membership avoids threshold discontinuities. On any failure the belief reduces to one global regime.
+
+\subsection{The variance term structure}
+
+Let $\sigma^2_{\text{now}}=\hat\sigma^2_{E,\tau}$ and let the long-run level be the blend
+\begin{equation}
+  \sigma^2_{\mathrm{LR}} = (1-\omega)\,\hat\sigma^2_{300}+\omega\,\hat\sigma^2_{L}.
+\end{equation}
+
+\begin{proposition}[Aggregated variance under geometric mean reversion]\label{prop:agg}
+Suppose one-step conditional variances satisfy $\E_\tau[\sigma^2_{\tau+i}]=\sigma^2_{\mathrm{LR}}+\phi^{\,i-1}(\sigma^2_{\text{now}}-\sigma^2_{\mathrm{LR}})$,
+$i\ge1$, and steps are conditionally uncorrelated. Then
+\begin{equation}\label{eq:agg}
+  V(s) := \Var_\tau\Bigl(\sum_{i=1}^s x_{\tau+i}\Bigr) = s\,\sigma^2_{\mathrm{LR}} + (\sigma^2_{\text{now}}-\sigma^2_{\mathrm{LR}})\,\frac{1-\phi^s}{1-\phi}.
+\end{equation}
+\end{proposition}
+\begin{proof}
+With conditionally uncorrelated steps, $\Var_\tau(\sum x_{\tau+i})=\sum_i\E_\tau[\sigma^2_{\tau+i}]$ by the law of total variance (the conditional means
+are zero). Summing the geometric series gives $\sum_{i=1}^s\phi^{i-1}=(1-\phi^s)/(1-\phi)$.
+\end{proof}
+This is the GARCH(1,1) variance term structure with persistence $\phi=\alpha+\beta$. It interpolates between the current EWMA variance at short
+horizons and the long-run level at long ones: $V(s)/s\to\sigma^2_{\text{now}}$ as $s\to 1$ and $V(s)/s\to\sigma^2_{\mathrm{LR}}$ as $s\to\infty$. The
+implementation floors $V(s)\ge0.05\,s\,\sigma^2_{\mathrm{LR}}$ and takes a running maximum over the grid's step points, so the cumulative path
+variance is non-decreasing. We use $\phi=0.985$ per business day (half-life of about $46$ days).
+
+\paragraph{Serial dependence.} Steps are not exactly uncorrelated at the horizon (trend or mean reversion). The empirical variance ratio from
+overlapping $s$-sums of demeaned steps,
+\begin{equation}
+  \widehat{VR}(s)=\frac{\widehat{\Var}\bigl(\sum_{i=1}^s x_{t+i}\bigr)}{s\,\widehat{\Var}(x_t)},
+\end{equation}
+is noisy, since about $n/s$ independent blocks enter it. We therefore shrink it toward $1$ with a pseudo-count, in empirical-Bayes form:
+\begin{equation}\label{eq:vr}
+  VR^\star(s) = \mathrm{clip}\Bigl(1+\frac{n/s}{n/s+n_0}\bigl(\widehat{VR}(s)-1\bigr),\,0.6,\,1.6\Bigr),\qquad n_0=40,
+\end{equation}
+on at most the last $5{,}000$ steps, and $VR^\star\equiv1$ when $n<3s+20$. The final cumulative variance at step count $s$ is
+$c^2\,VR^\star(s)\,V(s)$ with a global scale $c$ and per-asset family scale multipliers (Section~\ref{sec:policy}).
+
+\subsection{The centre}
+
+\begin{equation}
+  \text{centre}(s) = \text{anchor} + s\bigl[\kappa\,\hat\mu_{300} + \kappa_{\mathrm{LR}}\,\hat\mu_{L}\bigr].
+\end{equation}
+M0 uses $\kappa=1$. For level targets we use $\kappa=0$ (driftless). For log-return targets the prior is $0.25\hat\mu_{300}+0.75\hat\mu_{L'}$ with
+$L'=\max(L,2500)$, and the fitted vintages set the return drift to $0$ as well. The trailing mean has standard error
+$\hat\sigma/\sqrt{299}$ per step, so at $s=126$ its contribution to the centre has standard deviation $126\,\hat\sigma/\sqrt{299}\approx7.3\hat\sigma$,
+about $0.65$ of the horizon standard deviation $\sqrt{126}\,\hat\sigma\approx11.2\hat\sigma$. For a martingale this is pure noise, and it
+enlarges the mean squared error of the centre by roughly $40\%$ of the horizon variance. Removing it improves CRPS on average. It does \emph{not}, however, improve the
+ratio loss on its own (Section~\ref{sec:results}), because deviations from M0's centre are penalised convexly.
+
+\subsection{Monthly macro series}
+
+For the monthly CPI/PCE/payroll/unemployment cards the step is a monthly change $\Delta_t$, and inflation and payroll growth are strongly
+persistent. With $\tilde\Delta_t$ an EWMA of changes (half-life $6$ months):
+\begin{align}
+  \text{drift} &= 0.7\,\tilde\Delta_\tau + 0.3\,\overline{\Delta},\\
+  \hat\sigma^2_\varepsilon &= \tfrac12\,\mathrm{MAD}(e)^2\cdot1.4826^2 + \tfrac12\,\widehat{\Var}(e_{-60:}),\qquad e_t=\Delta_t-\tilde\Delta_{t-1},\\
+  \hat\sigma_\mu &= \sd\bigl(\tilde\Delta_{t}-\tilde\Delta_{t-1}\bigr)_{-60:}\cdot\sqrt6,\\
+  V(s) &= s\,\hat\sigma^2_\varepsilon + s^2\,\hat\sigma^2_\mu .
+\end{align}
+The $s^2$ term represents a slowly moving trend (drift uncertainty grows linearly in the horizon, so its variance grows quadratically). The
+MAD blend keeps a single COVID-type print from dominating the innovation scale. The step count $s$ is the M0 month count
+(Section~\ref{sec:baseline}), which includes the panel's publication lag.
+
+\subsection{Transfer cards}
+
+On F2 transfer cards the target's own path is withheld: only an early window plus the as-of level is shipped. M0 then estimates its scale from the
+early window, which for a formerly managed currency is almost zero. Let $\sigma_{\mathrm{early}}$ be the standard deviation of log steps inside the
+early window (gap-dropped) and $\sigma_{\mathrm{proxy}}$ the median, across G10 currencies, of the standard deviation of daily log returns over the last
+$300$ observations. We blend in log-variance space:
+\begin{equation}
+  \log\sigma^2_{\mathrm{rel}} = (1-w)\log\sigma^2_{\mathrm{early}} + w\log\bigl(1.25\,\sigma_{\mathrm{proxy}}\bigr)^2,\qquad w=0.5,
+\end{equation}
+with an emerging-market premium of $1.25$, and set $\sigma_{\mathrm{level}}=\sigma_{\mathrm{rel}}\cdot|\text{anchor}|$ and $V(s)=s\,\sigma^2_{\mathrm{level}}$.
+The geometric blend is appropriate because vol scales multiplicatively and neither source alone is trustworthy. The text layer can then express a
+regime (managed versus stressed) through the scenario mixture.
+
+\subsection{Analogues and foundation models}
+
+A same-series analogue engine (Mahalanobis nearest neighbours on vol ratio and $20$/$63$-day trend $z$-scores, estimated on the unit's own history
+only, voting on the width) is implemented but disabled, pending a robust walk-forward gain. A time-series foundation model is \emph{not} used: the
+artifact policy requires separate approval for any pretrained neural checkpoint, the image must run without a GPU, and the component was never
+load-bearing. \code{numerical/foundation.py} is an explicit no-op.

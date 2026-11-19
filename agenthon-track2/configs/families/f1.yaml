@@ -1,0 +1,8 @@
+# F1 policy knobs (one backbone; see src/agenthon/families/f1.py)
+families:
+  f1:
+    gate_intercept_shift: -0.3
+    text_strength: 0.8
+    tail_strength: 0.5
+    dependence_strength: 0.5
+    scale_mult: 1.0

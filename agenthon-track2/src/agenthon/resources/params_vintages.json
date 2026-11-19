@@ -1,0 +1,106 @@
+{
+  "description": "Walk-forward-fitted overrides; a card uses the newest vintage with fit_cutoff < its as-of. fit_cutoff = last date of any outcome used for fitting/selection (offline/experiments/tune.py).",
+  "vintages": [
+    {
+      "fit_cutoff": "2008-12-31",
+      "source_run": "T_base (prior belief params)",
+      "n_cards": 1027,
+      "overrides": {
+        "numerical": {
+          "df": 1000.0,
+          "drift_shrink": 0.0,
+          "drift_shrink_return": 0.0
+        },
+        "decision": {
+          "gamma": 1.25,
+          "lambda": 0.35
+        },
+        "policy": {
+          "enabled": false
+        }
+      },
+      "walk_forward_score": 0.9675
+    },
+    {
+      "fit_cutoff": "2014-12-31",
+      "source_run": "R2_base",
+      "n_cards": 2104,
+      "overrides": {
+        "numerical": {
+          "lr_omega": 0.0,
+          "df": 1000.0,
+          "drift_shrink": 0.0,
+          "drift_shrink_return": 0.0
+        },
+        "tails": {
+          "in_unit_backtest": false
+        },
+        "policy": {
+          "pessimism": 2.0
+        },
+        "decision": {
+          "gamma": 1.25,
+          "lambda": 0.2
+        }
+      },
+      "walk_forward_score": 0.9449
+    },
+    {
+      "fit_cutoff": "2024-12-31",
+      "source_run": "R2_base",
+      "n_cards": 3896,
+      "overrides": {
+        "numerical": {
+          "lr_omega": 0.0,
+          "df": 1000.0,
+          "drift_shrink": 0.0,
+          "drift_shrink_return": 0.0
+        },
+        "tails": {
+          "in_unit_backtest": false
+        },
+        "policy": {
+          "pessimism": 2.0
+        },
+        "decision": {
+          "gamma": 1.0,
+          "lambda": 0.3
+        }
+      },
+      "walk_forward_score": 0.9566,
+      "family_overrides": {
+        "T2-F4": {
+          "families": {
+            "f4": {
+              "scale_mult": 1.35
+            }
+          },
+          "decision": {
+            "gamma": 0.0,
+            "lambda": 0.3
+          },
+          "policy": {
+            "enabled": false
+          },
+          "_evidence": "practice F4 (29 event cards): belief x1.4 robust 0.968-0.973 across lambda vs 1.085 at the generic action"
+        },
+        "T2-F2": {
+          "families": {
+            "f2": {
+              "scale_mult": 1.2
+            }
+          },
+          "decision": {
+            "gamma": 0.5,
+            "lambda": 0.5
+          },
+          "policy": {
+            "enabled": false
+          },
+          "_evidence": "practice F2 (23 event cards): heavy M0 hedge ~0.99 vs 1.035; walk-forward prefers sharper -> compromise"
+        }
+      },
+      "family_overrides_fit_note": "chosen on practice outcomes (<= 2024-12-31); applies only to cards after the cutoff"
+    }
+  ]
+}
