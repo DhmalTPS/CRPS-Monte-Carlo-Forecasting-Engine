@@ -54,3 +54,5 @@ team_key*
 team-key*
 *.env
 .env*
+
+!/LICENSE
