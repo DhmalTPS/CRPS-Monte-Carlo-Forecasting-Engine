@@ -1,4 +1,4 @@
-# agenthon-track2 — a hard-to-break probabilistic forecasting engine with a gated LLM
+# agenthon-track2 — a fail-safe probabilistic forecasting engine with a gated LLM
 
 Agenthon 2026 Track 2 (reasoning-augmented time-series forecasting). One Docker verb,
 `forecast`, turns a unit (card + point-in-time panels + dated corpus) into
@@ -15,25 +15,28 @@ The design principle, validated rather than assumed:
 ## Quick start
 
 ```bash
-pip install -e .                       # numpy, pandas, pyarrow, pyyaml
+pip install -e ".[dev]"                # numpy, pandas, pyarrow, pyyaml (+ pytest)
 forecast --panels <unit>/panels/ --text <unit>/text/ --asof YYYY-MM-DD --out out/forecast.parquet
-python scripts/validate_submission.py --card <unit>/card.toml --out out   # OFFICIAL gates g0-g3
+python scripts/validate_submission.py --card <unit>/card.toml --out out   # official gates g0-g3 (needs the organiser scorer, see below)
 python -m pytest                       # 84 tests: unit, integration, adversarial
 ```
 
-Image: `docker build --platform linux/amd64 -t agenthon-t2:1.0.0 .` then
-`bash submission/run.sh <unit-dir>` (offline, read-only, uid 65534, 64 MiB /tmp, 256 PIDs —
+The gate validator (and the last step of `submission/run.sh`) imports the organiser scorer:
+`pip install qfbench2-common@v2.4.4` and `pip install -e <track2-forecasting-public>`.
+
+Image: `docker build --platform linux/amd64 -t agenthon-t2:1.0.1 .` then
+`bash submission/run.sh <unit-dir> agenthon-t2:1.0.1` (offline, read-only, uid 65534, 64 MiB /tmp, 256 PIDs —
 the Development runtime's exact restrictions). Upload: `python scripts/run_submission.py
 --image <registry>/<repo>@sha256:<digest>` (validates and seals the descriptor with the
 toolkit), then `qfbench2 submission pack ...`.
 
-## What is verified (this repository, 2026-09-28)
+## What is verified (this repository, 2026-09-29, v1.0.1)
 
 | Check | Result |
 |---|---|
 | Official gates g0-g3 (installed `qfbench2_track_forecasting`) on all 104 practice units | **104/104 admissible**, all on the full path |
 | Same, under the image's pinned stack (Py 3.13.5, numpy 2.1.3, pandas 2.2.3, pyarrow 18.1.0) | 104/104, 84/84 tests |
-| M0 replica vs docs/M0-BASELINE.md worked example | seed 795546941, 128 steps, horizon rule 24→21, monthly 8/9, NFP 2 |
+| M0 replica vs the organiser's `docs/M0-BASELINE.md` worked example (track2-forecasting-public) | seed 795546941, 128 steps, horizon rule 24→21, monthly 8/9, NFP 2 |
 | Submitting the M0 replica in the walk-forward | **exactly 1.0000** on 3,896 cards (normalisation chain verified) |
 | Metric parity vs `qfbench2_common` (CRPS / variogram / pinball) | |Δ| ≤ 3e-16 |
 | House HTTP contract (mock server) | `/v1/chat/completions`, Bearer, n=1, thinking off, no tools; 503 → lexicon |
@@ -41,11 +44,12 @@ toolkit), then `qfbench2 submission pack ...`.
 | Container, harness-exact (read-only, uid 65534, no network, 64 MiB /tmp) | 104/104 admissible (`scripts/docker_smoke.ps1 -All`) |
 | Runtime, numeric path | 0.38 s mean, 0.64 s max per unit (+ ≤ 2 × 120 s for House calls) |
 
-## Results (walk-forward, production-exact, out-of-sample by construction)
+## Results (walk-forward, production-exact, parameters out of sample by vintage)
 
 3,896 synthetic cards on the reconstructed 2000-2024 panels, shaped like the practice roster.
 Every card uses only parameters fitted on outcomes known BEFORE its as-of (vintaged
-artifacts), so the whole table is out of sample. Lower is better; 1.0 = M0.
+artifacts), so every fitted parameter is out of sample; the policy pessimism and the prior λ
+were chosen on this walk-forward. Lower is better; 1.0 = M0.
 
 | rung | mean | 95% CI (quarter-block bootstrap) | note |
 |---|---|---|---|
@@ -55,7 +59,7 @@ artifacts), so the whole table is out of sample. Lower is better; 1.0 = M0.
 | **M11 full system (ships)** | **0.968** | **[0.952, 0.985]** | score-aware (γ, λ) + safe policy |
 | M11 + PIT calibration (M10) | 0.971 | [0.956, 0.991] | rejected: worse OOS (0.964 → 0.977 after 2015) |
 
-Out-of-sample by vintage: 2009-2014 cards (≤2008 vintage) **0.936**; 2015-2024 cards
+By vintage: 2009-2014 cards (≤2008 vintage) **0.936**; 2015-2024 cards
 (≤2014 vintage + policy) **0.964**; 2003-2008 cards use theory priors only (1.006).
 
 Stress windows (M11): taper 0.954, COVID 0.985, GFC 1.013, 2022 hikes 1.062 — the system is
@@ -64,7 +68,8 @@ weakest exactly where cards are event-selected, which is why the ≤2024 vintage
 
 Practice units (event-selected; realised values reconstructed from the published history,
 evaluation only): numeric system by family F1 0.906 → F3 0.942 at the generic action;
-F2/F4 cannot beat M0 without text (best ~0.99 / 0.97 with a widened belief). Lexicon-only
+F2/F4 do not beat M0 at the generic action (best 0.993 for F2; F4 1.010, or 0.97 with the
+belief widened ×1.4). Lexicon-only
 text is neutral (Δtext +0.001) — as designed, a capped fallback. The LLM's Δtext cannot be
 measured offline (no House endpoint off-platform); the gate bounds its downside.
 
@@ -81,8 +86,8 @@ measured offline (no House endpoint off-platform); the gate bounds its downside.
    mixing a fraction λ of M0-law draws gives ratio ≤ (1-λ)·ratio + λ. Joint (γ, λ): 1.049 →
    0.955 on the same belief.
 4. **Pessimism is what makes RL work in noisy finance.** A contextual policy over (γ, λ)
-   overfits at low pessimism (test 0.970 vs 0.9665 default) and helps only with an LCB rule
-   (pessimism 2: 0.963). Offline rewards are full-information, so the policy is cost-sensitive
+   overfits at low pessimism (test 0.969 vs 0.9665 default) and helps only with an LCB rule
+   (pessimism 1-2: 0.964-0.965; `offline/reports/tables/policy_eval.csv`). Offline rewards are full-information, so the policy is cost-sensitive
    contextual learning with safe policy improvement — not PPO.
 5. **Event selection.** Practice cards are authored around shocks; uniform-date validation
    understates tail risk. F4/F2 overrides (belief ×1.35 / ×1.2, heavier M0 hedge) enter only
@@ -116,7 +121,7 @@ any exception ─ safety/       exact M0 draws → minimal walk → constant (ne
 * House model only via `MODEL_ENDPOINT/v1/chat/completions` + `MODEL_TOKEN`; ≤ 3 calls/unit
   of the 25 allowed; ≤ 4000 output tokens; no vendor tools; temperature 0 and seed pinned.
 * No pretrained neural checkpoints (artifact policy): text is lexical (BM25/dictionaries);
-  `numerical/foundation.py` is a documented no-op. The RTX GPU is not needed: the numeric
+  `numerical/foundation.py` is a documented no-op. No GPU is needed: the numeric
   path is 0.4 s/card on CPU and the image must run without a device.
 * No cross-unit lookup: retrieval and analogues use the mounted unit only; nothing derived
   from a unit's target is baked into the image. Practice outcomes are used for evaluation and
@@ -128,7 +133,7 @@ any exception ─ safety/       exact M0 draws → minimal walk → constant (ne
 ## Layout
 
 `src/agenthon/` production (what the image runs) · `configs/` priors, profiles, families ·
-`prompts/` system + task prompts + Z schema · `offline/` walk-forward, ablations M0-M12,
+`prompts/` system + task prompts + LLM output schema · `offline/` walk-forward, ablations M0-M12,
 scoring, RL training, experiments, reports · `tests/` unit / integration / adversarial ·
 `scripts/` local runs, gate validation, submission prep · `submission/` image wrappers.
 

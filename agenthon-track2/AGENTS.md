@@ -1,4 +1,4 @@
-# AGENTS.md — rules for anyone (human or agent) changing this repository
+# AGENTS.md — rules for changing this repository
 
 ## Non-negotiables
 1. **Never cost a card.** Every code path ends in `output.write_forecast` or
@@ -14,7 +14,7 @@
    family scalars only, and only in vintages dated after them.
 5. **House model only**, through `MODEL_ENDPOINT` + `MODEL_TOKEN`; no vendor APIs, no tools,
    temperature/seed pinned, thinking off for structured calls. No neural checkpoints in the
-   image without written organizer approval.
+   image without written organiser approval.
 6. **Text may widen freely but narrow only on an established fact** (`allow_text_narrowing`).
 
 ## Changing the model

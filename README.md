@@ -21,7 +21,7 @@ Scoring is a composite of marginal CRPS (50%), joint variogram score (30%) and a
 1. **Strict as-of discipline.** Panel rows after the as-of and undated or future documents are dropped (`src/agenthon/data/availability.py`, tested in `tests/unit/test_cutoff.py`). Every fitted parameter is *vintaged*: a card may only use a vintage whose `fit_cutoff < as-of` (vintages 2008-12-31, 2014-12-31, 2024-12-31; see `ARTIFACT_PROVENANCE.md`).
 2. **Numerical prior.** EWMA-to-long-run variance term structure with shrunk variance ratios, plus an exact replica of the M0 baseline that doubles as the fail-safe.
 3. **Joint Monte Carlo sampler.** Correlated Gaussian path increments (Cholesky), a shared t-mixing scale, antithetic pairs and a soft zero-lower-bound floor (`src/agenthon/sampling/`).
-4. **Text path, bounded by construction.** BM25 retrieval with recency, de-duplication and MMR; one schema-constrained LLM call (temperature 0, seed pinned) with a lexicon fallback; a monotone logistic information gate where g = 0 makes the text-on forecast identical to the text-blind one; text-driven widening capped at 2x.
+4. **Text path, bounded by construction.** BM25 retrieval with recency, de-duplication and MMR; one schema-constrained LLM call (at most 3 with retries; temperature 0, seed pinned) with a lexicon fallback; a monotone logistic information gate where g = 0 makes the text-on forecast identical to the text-blind one; text-driven widening capped at 2x.
 5. **Score-aware decision layer.** Under a ratio loss, a better honest forecast is not the optimal submission. For a proper score S and outcome weight w(y) = 1/S_M0(y), the optimal report is the belief reweighted by w. The engine resamples the belief with weights w^γ (tempered, with a 60% spread floor) and mixes in a fraction λ of M0 draws, which caps blow-ups because CRPS is convex in the forecast. (γ, λ) is chosen per card by a contextual Bayesian-ridge policy with a lower-confidence-bound rule. Derivations are in the report appendix.
 6. **Never miss a card.** Any exception falls back to exact M0 draws, then a minimal walk, then a constant.
 
@@ -33,7 +33,7 @@ All scores are ratios to M0 (1.0 = baseline, lower is better).
 |---|---|---|
 | **Official Development leaderboard score** (v1.0.1, 71/71 cards scored) | **0.9782** | `docs/report/sections/12_results.tex`; per-card table `offline/reports/leaderboard/dev_upload1_v1.0.1.csv` |
 | By family (official Dev) | F1 0.895, F2 0.965, F3 0.947, **F4 1.078** | same |
-| **Walk-forward, full system M11** (3,896 synthetic cards, out-of-sample by vintage) | **0.968, 95% CI [0.952, 0.985]** (quarter-block bootstrap) | `offline/reports/tables/ablation_ladder.csv` |
+| **Walk-forward, full system M11** (3,896 synthetic cards; parameters fitted out of sample by vintage, design choices made on the same walk-forward) | **0.968, 95% CI [0.952, 0.985]** (quarter-block bootstrap) | `offline/reports/tables/ablation_ladder.csv` |
 | Final-phase leaderboard rank | 38 / 87 | final results (not recorded in this repository) |
 
 Walk-forward ablation ladder (same 3,896 cards):
@@ -46,17 +46,17 @@ Walk-forward ablation ladder (same 3,896 cards):
 | **M11 full system (shipped)** | **0.968** | **[0.952, 0.985]** |
 | M11 + PIT calibration (M10) | 0.971 | [0.956, 0.991] |
 
-Out-of-sample by vintage: 2009-2014 cards 0.936; 2015-2024 cards 0.964; 2003-2008 cards (theory priors only) 1.006.
+By vintage (fitted parameters out of sample; the policy pessimism and the prior λ were chosen on this walk-forward): 2009-2014 cards 0.936; 2015-2024 cards 0.964; 2003-2008 cards (theory priors only) 1.006.
 
 **What did not work, or is not established:**
 
 - **Better honest forecasts lose under the ratio loss.** M1 and M2 improve the belief but score 1.048 and 1.064; almost all of the gain comes from the decision layer, not from a sharper point forecast.
 - **Stress windows:** taper 0.954, COVID 0.985, but **GFC 1.013 and 2022 hikes 1.062**, i.e. worse than the baseline exactly where cards are event-selected. The tail/shock family F4 is also worse than baseline on the official board (1.078).
-- **The text/LLM contribution is not statistically distinguishable from zero.** Official (LLM on) minus local (text off) on the same cards: -0.0095, 95% CI [-0.026, +0.009]. The lexicon-only fallback is neutral (Δ +0.001).
+- **The text/LLM contribution is not statistically distinguishable from zero.** Official (LLM on) minus local (lexicon fallback, no LLM) on the same 65 cards: -0.0095, 95% CI [-0.026, +0.009]. The lexicon-only fallback is neutral (Δ +0.001).
 - **PIT calibration was rejected**: worse out of sample after 2015 (0.964 to 0.977). Fat-tailed beliefs (ν = 7) were the worst belief variant.
 - **RL policy overfits without pessimism**; it helps only with an LCB rule.
-- Local reconstruction of the official Dev cards scores 0.983 (per-card correlation with the official scorer 0.912 on 65 cards). The F2/F4 family overrides in the 2024 vintage were tuned on practice outcomes and are in-sample.
-- 75 of 103 practice units leak their realised values through sibling units' panels, so the practice board was not used as a tuning signal.
+- On the 65 Dev cards the local evaluator can reconstruct, the official score is 0.983 and the local reconstruction 0.992 (per-card correlation 0.912). The F2/F4 family overrides in the 2024 vintage were tuned on practice outcomes and are in-sample.
+- 75 of the 103 practice cards leak their realised values through sibling units' panels, so the practice board was not used as a tuning signal.
 
 ## Repository layout
 
@@ -85,10 +85,12 @@ Requires Python 3.11+ (developed on 3.13).
 ```bash
 cd agenthon-track2
 pip install -e ".[dev]"            # numpy, pandas, pyarrow, pyyaml (+ pytest)
-python -m pytest                   # 84 tests; 7 skip unless the organiser scorer is installed
+python -m pytest                   # 84 tests; 9 skip without the organiser scorer and a sibling _reference/track2-forecasting-public checkout
 
 # forecast one practice unit from track2-forecasting-public/units/<unit>
 forecast --panels <unit>/panels/ --text <unit>/text/ --asof YYYY-MM-DD --out out/forecast.parquet
+# the official gates need the organiser scorer: pip install qfbench2-common@v2.4.4
+# and pip install -e <track2-forecasting-public> (provides qfbench2_track_forecasting)
 python scripts/validate_submission.py --card <unit>/card.toml --out out   # official gates g0-g3
 
 # container, with the harness's restrictions (offline, read-only, uid 65534)
@@ -103,4 +105,5 @@ The LLM path reads `MODEL_ENDPOINT` and `MODEL_TOKEN` from the environment; with
 - 0.9782 is the **Development-phase** score on 71 historical practice cards (2003-2024). The sealed Final window is H2 2025 to Q2 2026; the Final score is not recorded here.
 - The walk-forward cards are synthetic (uniform dates, every 21 business days from 2003), so they under-sample the shock-centred cards the organisers write; this is the main reason the stress and F4 numbers are weaker.
 - The value of the LLM is essentially unmeasured offline: the organiser endpoint exists only inside the scoring environment.
+- The compiled report PDF (`docs/report/agenthon_track2_report.pdf`) predates a correction made in the LaTeX source (`12_results.tex`) and this README: under the Development configuration the 65 reconstructable Dev cards score 0.992 locally (0.983 is their official score). Its policy section also quotes a ridge setting (λ_r = 100) whose run is not committed; the committed `offline/reports/tables/policy_eval.csv`, which `agenthon-track2/README.md` quotes, gives test 0.969 at pessimism 0 and 0.964-0.965 at pessimism 1-2 (vs 0.9665 default).
 - See `docs/report/sections/14_limitations.tex` for the full list.

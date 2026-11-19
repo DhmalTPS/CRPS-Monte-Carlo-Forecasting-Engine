@@ -18,7 +18,7 @@ in each unit's `manifest.json`. No 2025+ data. No text corpus was used for fitti
 Models disclosed in `submission.json`: the approved House model
 `nvidia/nemotron-3-super-120b-a12b` (`rl-030326-fp8`, training cutoff `unpublished`,
 `access: api`). The fitted artifacts above are non-neural parameter tables of our own
-numerical code; list them as `access: "local"` entries if the organizer requests it.
+numerical code; list them as `access: "local"` entries if the organiser requests it.
 
 Library versions (image): Python 3.13-slim-bookworm, numpy 2.1.3, pandas 2.2.3,
 pyarrow 18.1.0, PyYAML 6.0.2.

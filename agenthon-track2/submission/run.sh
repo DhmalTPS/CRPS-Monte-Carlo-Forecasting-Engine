@@ -3,7 +3,7 @@
 #   bash submission/run.sh <unit-dir> [image]
 set -euo pipefail
 UNIT="${1:?unit directory}"
-IMAGE="${2:-agenthon-t2:1.0.0}"
+IMAGE="${2:-agenthon-t2:1.0.1}"
 OUT="$(mktemp -d)"
 chmod 777 "$OUT"
 ASOF="$(python3 - "$UNIT" <<'PY'
