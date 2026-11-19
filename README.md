@@ -7,6 +7,7 @@ A point-in-time probabilistic forecaster that emits joint Monte Carlo draws for 
 - **Event:** Agenthon 2026 (a NeurIPS 2026 competition), Track 2: reasoning-augmented probabilistic time-series forecasting, built on the QFBench 2.0 benchmark and scored on CodaBench.
 - **Dates:** built September 2026; Development upload 2026-09-29; Final + Verification phase 13-25 October 2026.
 - **Team:** solo (registered as "Team 89").
+- **Authorship:** the research design, evaluation protocol and final selection are mine. I used AI coding assistants for parts of the implementation and for adversarial review.
 - **Organiser material (not included here):** [Agenthon-2026/Agenthon2026-public](https://github.com/Agenthon-2026/Agenthon2026-public) (rules, starter packs) and [Agenthon-2026/track2-forecasting-public](https://github.com/Agenthon-2026/track2-forecasting-public) (practice units, official scorer `qfbench2_track_forecasting`).
 
 ## Problem
